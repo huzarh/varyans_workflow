@@ -10,8 +10,7 @@ import numpy as np
 from pymavlink import mavutil
 from PySide6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout
 from PySide6.QtGui import QImage, QPixmap, QFont
-from PySide6.QtCore import Qt, QTimer
-
+from PySide6.QtCore import Qt, QTimer, QThread, Signal
 # kendi kodlarımız
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
