@@ -622,3 +622,30 @@ class IntegratedIHAInterface(QWidget):
                 self.cam.stop()
         except Exception:
             pass
+        
+        # MAVLink bağlantısını kapat
+        self.mavlink_manager.disconnect()
+        
+        return super().closeEvent(event)
+
+# ================== Ana Çalıştırma ==================
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    
+    # Uygulama özellikleri
+    app.setApplicationName("İHA Hedef Tespit + MAVLink Sistem")
+    app.setOrganizationName("Varyans")
+    
+    # Ana pencere
+    win = IntegratedIHAInterface()
+    win.show()
+    
+    print("🚁 İHA Entegre Sistem başlatıldı!")
+    print("📋 Kullanım:")
+    print("1. MAVLink Bağlan butonuna tıklayın")
+    print("2. Tespit Başlat ile hedef arama başlatın")  
+    print("3. Hedef tespit edildiğinde otomatik GUIDED moda geçer")
+    print("4. Manuel kontrollerle de mod değiştirebilirsiniz")
+    
+    sys.exit(app.exec())
