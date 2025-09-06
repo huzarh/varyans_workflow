@@ -1,0 +1,40 @@
+[General]
+TcpServerPort=5760
+ReportStats=false
+# TcpServerPort: Opsiyonel, telemetri veya simülasyon bağlantıları için açılabilir
+# ReportStats: false → Pi CPU üzerindeki yükü azaltır
+
+[UartEndpoint pixhawk]
+Device=/dev/ttyACM0
+Baud=57600
+# USB üzerinden Pixhawk bağlantısı
+# Bu endpoint, Pi ile uçuş kontrolcüsü arasındaki ana MAVLink kanalıdır
+# Tüm komutlar ve veri (position, attitude, RC override vb.) buradan geçer
+# Pi 5 CPU ve USB bandwidth göz önünde bulundurulmalı
+
+[UdpEndpoint missionplanner]
+Mode=Normal
+Address=10.7.225.60
+Port=14550
+# PC üzerinde Mission Planner
+# Pi -> PC UDP akışı ile waypoint, telemetry (isteğe bağlı) gönderilir
+# Mission Planner’ın IP’si sabit olmalı, port 14550 standart MAVLink UDP portu
+# Sadece izleme / waypoint atama amaçlıdır, kritik uçuş komutları buradan gitmez
+
+[UdpEndpoint localudp]
+Mode=Normal
+Address=127.0.0.1
+Port=14540
+# Pi üzerindeki scriptler için MAVLink UDP kanalı
+# Vision, flight logic veya diğer modüller Pi içinde buradan Pixhawk ile haberleşir
+# Örnek: Vision script hedef pozisyonunu hesaplar -> UDP ile flight script’e gönderir
+# Portlar çakışmamalı, Mission Planner ile ayrı tutulmalı
+
+# Kurallar / Öneriler:
+# 1️⃣ Pixhawk USB: tüm uçuş komutları ve kritik veri burada
+# 2️⃣ Mission Planner UDP: izleme ve waypoint atama, uçuş kontrolü kritik değil
+# 3️⃣ Local UDP: Pi içi modüller arası haberleşme
+# 4️⃣ Fail-safe: Mission Planner koparsa uçuş Pixhawk üzerinden sorunsuz devam eder
+# 5️⃣ Pi 5 kaynak yönetimi: UDP ve USB bandwidth izlenmeli, özellikle vision işleme sırasında
+# 6️⃣ Uçuş esnasında port ve IP sabit kalmalı, DHCP ile değişiklik olmamalı
+# 7️⃣ Raspbian / Pi OS güncel olmalı, MAVLink Router ve libmavlink uyumlu versiyon kullanılmalı
