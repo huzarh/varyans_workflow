@@ -316,7 +316,10 @@ def detect_targets(mask, min_area, tracked_list):
             t["lost_frames"]+=1
     tracked_list[:]=[t for t in tracked_list if t["lost_frames"]<=lost_frame_threshold]
 
-def build_detection_info(color_name, target_dict, frame_shape):
+
+# ------ state manger -----
+
+def build_detection_info(color_name, target_dict, frame_shape,state: StateManager):
     cx, cy = int(target_dict["cx"]), int(target_dict["cy"])
     contour = target_dict.get("contour", None)
     area_px2 = bbox_area_px2(contour) if contour is not None else 0
@@ -329,6 +332,7 @@ def build_detection_info(color_name, target_dict, frame_shape):
         dist_size, side_px, pts = estimate_distance_m_robust(contour, frame_shape)
     chosen_dist = dist_alt if dist_alt is not None else dist_size
     lat, lon = get_current_gps()
+    state.update_target({color_name},cx, cy, int(area_px2), compute_confidence(target_dict, frame_shape))
     info = {
         "detected": True,
         "type": f"{color_name}_4x4",

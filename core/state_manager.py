@@ -8,20 +8,22 @@ class StateManager:
         # initial vars
         self.state["target_detected"] = False
         self.state["target_info"] = {
+            "type":None,
             "cx": None,
             "cy": None,
-            "bearing": None,
-            "distance": None,
+            "bbox_area": None,
             "confidence": 0.0
         }
 
-    def update_target(self, cx, cy, bearing, distance, confidence):
+    def update_target(self,type, cx, cy, bbox_area, confidence):
+        # test print
+        print("----------> " + type, cx, cy, bbox_area, confidence)
         self.state["target_detected"] = True
         self.state["target_info"] = {
+            "type":type, 
             "cx": cx,
             "cy": cy,
-            "bearing": bearing,
-            "distance": distance,
+            "bbox_area": bbox_area,
             "confidence": confidence,
         }
 
