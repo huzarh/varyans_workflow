@@ -1,25 +1,26 @@
-# cammod3_picam_gui.py — RPi Camera Module 3 (IMX708) + Picamera2 + PySide6
+# main kode kütüphaneler
 import sys
-import cv2
-import numpy as np
+import os
 import math
-import json 
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QLabel, QPushButton, QVBoxLayout,
-    QHBoxLayout
-)
-from PySide6.QtGui import QImage, QPixmap, QFont
-from PySide6.QtCore import Qt, QTimer
-from pymavlink import mavutil
+import json
 import time
 
-# remzi.py
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# Add the parent directory to Python path
-import mavlink_func
+# göre ve amaç
+import cv2
+import numpy as np
+from pymavlink import mavutil
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout
+from PySide6.QtGui import QImage, QPixmap, QFont
+from PySide6.QtCore import Qt, QTimer
 
+# kendi kodlarımız
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import mavlink_func
 from controller import motion
+
+# state manager kütüphanesi
+from core.state_manager import StateManager
 
 # Run your function
 # print("MAVLink bağlantısı kuruluyor...")
@@ -513,6 +514,7 @@ class IHAInterface(QWidget):
                     detection_json_to_show = info
                     self.debug = dbg
                     print(json.dumps(info, ensure_ascii=False))
+                    print("------------------------ver------------------")
                 else:
                     cv2.circle(disp,(t["cx"],t["cy"]),4,color,-1)
 
