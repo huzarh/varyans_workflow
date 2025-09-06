@@ -1,58 +1,98 @@
-# cammod3_picam_gui.py — RPi Camera Module 3 (IMX708) + Picamera2 + PySide6
 import sys
 import cv2
 import numpy as np
 import math
-import json 
+import json
+import platform
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QLabel, QPushButton, QVBoxLayout,
-    QHBoxLayout
+    QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog
 )
 from PySide6.QtGui import QImage, QPixmap, QFont
 from PySide6.QtCore import Qt, QTimer
-from pymavlink import mavutil
-import time
 
-# remzi.py
-import os
+# ----------------- Kamera Soyutlama (RPi uyumlu) -----------------
+PICAM_AVAILABLE = False
+try:
+    from picamera2 import Picamera2
+    PICAM_AVAILABLE = True
+except Exception:
+    PICAM_AVAILABLE = False
 
-# Add the parent directory to Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+class FrameGrabber:
+    """
+    Raspberry Pi'de öncelik: Picamera2 (BGR888 -> doğrudan BGR)
+    Desteklenmiyorsa RGB888 al ve BGR'ye çevir.
+    Picamera2 hiç yoksa OpenCV VideoCapture (V4L2).
+    """
+    def __init__(self, width=1280, height=720, fps=30):
+        self.width, self.height, self.fps = width, height, fps
+        self.source = None
+        self.picam = None
+        self.cap = None
+        self.picam_format = None  # "BGR888" | "RGB888" | "XRGB8888" ...
+        self._open()
 
-import mavlink_func  # Now this should work
+    def _open(self):
+        if PICAM_AVAILABLE:
+            try:
+                self.picam = Picamera2()
+                # Tercihen BGR888 (OpenCV ile uyumlu). Bazı sensörlerde yoksa RGB888'e düş.
+                try:
+                    cfg = self.picam.create_video_configuration(
+                        main={"size": (self.width, self.height), "format": "BGR888"}
+                    )
+                    self.picam_format = "BGR888"
+                except Exception:
+                    cfg = self.picam.create_video_configuration(
+                        main={"size": (self.width, self.height), "format": "RGB888"}
+                    )
+                    self.picam_format = "RGB888"
+                self.picam.configure(cfg)
+                self.picam.start()
+                self.source = "picamera2"
+                return
+            except Exception as e:
+                print("Picamera2 açılamadı, OpenCV'ye düşülüyor:", e)
 
-# Run your function
-mavlink_func.test_mavlink_connection()
-# print("MAVLink bağlantısı kuruluyor...")
+        # OpenCV yakalama
+        backend = cv2.CAP_V4L2 if platform.system() != "Windows" else cv2.CAP_DSHOW
+        self.cap = cv2.VideoCapture(0, backend)
+        if self.cap is None or not self.cap.isOpened():
+            raise RuntimeError("Kamera açılamadı (ne Picamera2 ne V4L2).")
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+        self.source = "opencv"
 
-# try:
-#     master = mavutil.mavlink_connection('udp:127.0.0.1:14540')
-#     master.wait_heartbeat(timeout=5)
-#     print(f"✅ MAVLink bağlandı! System: {master.target_system}, Component: {master.target_component}")
-# except Exception as e:
-#     print(f"❌ MAVLink bağlantısı başarısız: {e}")
-#     sys.exit(1)
+    def read(self):
+        if self.source == "picamera2":
+            arr = self.picam.capture_array()
+            # Picamera2’den geleni BGR’ye getir
+            if self.picam_format == "BGR888":
+                frame_bgr = arr  # zaten BGR
+            elif self.picam_format == "RGB888":
+                frame_bgr = arr[:, :, ::-1].copy()  # RGB -> BGR
+            else:
+                # Güvenli dönüşüm (4 kanal gelirse)
+                if arr.ndim == 3 and arr.shape[2] == 4:
+                    frame_bgr = cv2.cvtColor(arr, cv2.COLOR_BGRA2BGR)
+                else:
+                    frame_bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+            return True, frame_bgr
+        else:
+            return self.cap.read()
 
-# # ------------------ Test Komutu Gönder ------------------
-# try:
-#     print("📤 TEST: STATUSTEXT mesajı gönderiliyor...")
-#     master.mav.statustext_send(
-#         mavutil.mavlink.MAV_SEVERITY_NOTICE,
-#         b"Baglanti testi: Varyans sistem basladi."
-#     )
-#     print("✅ STATUSTEXT mesajı gönderildi.")
-# except Exception as e:
-#     print(f"❌ MAVLink mesaj gönderimi hatası: {e}")
-#     sys.exit(1)
- 
-# ----------------- PiCamera2 İçe Aktarım -----------------
-from picamera2 import Picamera2
+    def release(self):
+        if self.source == "picamera2" and self.picam is not None:
+            try: self.picam.stop()
+            except Exception: pass
+        if self.source == "opencv" and self.cap is not None:
+            self.cap.release()
 
-# ----------------- OpenCV / Algılama Ayarları -----------------
+# ----------------- OpenCV Ayarları -----------------
 kernel = np.ones((5, 5), np.uint8)
-
 MAX_AREA_BLUE, MAX_AREA_RED, MIN_AREA = 20000, 20000, 300
-alpha_mask = 1.0
+alpha_mask = 1
 prev_mask_blue, prev_mask_red = None, None
 tracked_blue, tracked_red = [], []
 lock_threshold, lost_frame_threshold, position_tolerance = 3, 10, 60
@@ -60,13 +100,13 @@ lock_threshold, lost_frame_threshold, position_tolerance = 3, 10, 60
 # ------- MESAFE / KALİBRASYON AYARLARI -------
 REAL_SIZE_M = 0.05   # 5 cm kare hedef
 USE_HFOV   = True    # HFOV'tan odak hesapla
-HFOV_DEG   = 66.0    # Standart lens ~66°; wide lens ~120°
-FOCAL_PX   = None    # USE_HFOV=True iken otomatik hesaplanır; sabitlemek istersen sayı ver
+HFOV_DEG   = 66.0
+FOCAL_PX   = None
 
 # ------- ALTITUDE (Boş Alan) TABANLI MESAFE ------
-USE_ALTITUDE = True  # True ise, H (irtifa) varsa öncelikle bu yöntem kullanılır
+USE_ALTITUDE = True
 
-# ----------------- Geometri Yardımcıları -----------------
+# ----------------- Geometri Yardımcıları (değişmedi) -----------------
 def angle_cos(p0, p1, p2):
     d1, d2 = p0 - p1, p2 - p1
     return float(np.dot(d1, d2) / (np.linalg.norm(d1)*np.linalg.norm(d2) + 1e-8))
@@ -109,46 +149,33 @@ def ensure_focal_from_fov(frame_w):
     if USE_HFOV and FOCAL_PX is None and frame_w > 0:
         FOCAL_PX = (0.5 * frame_w) / math.tan(math.radians(HFOV_DEG * 0.5))
 
-# --------- ALTITUDE tabanlı mesafe ----------
 def distance_from_altitude(pixel, frame_shape, H_m):
     h, w = frame_shape[:2]
     ensure_focal_from_fov(w)
     if FOCAL_PX is None or H_m is None:
         return None, None
-
     u, v = float(pixel[0]), float(pixel[1])
     cx, cy = w/2.0, h/2.0
     f = float(FOCAL_PX)
     x = (u - cx) / f
     y = (v - cy) / f
-
     ground_range = H_m * math.sqrt(x*x + y*y)
     slant = H_m * math.sqrt(x*x + y*y + 1.0)
     return slant, ground_range
 
-# --------- Boyut temelli (PnP / yedek) ----------
 def estimate_distance_m_robust(contour, frame_shape):
     h, w = frame_shape[:2]
     ensure_focal_from_fov(w)
-
     pts = approx_square_corners(contour)
     if pts is None:
         return None, None, None
-
     f = FOCAL_PX if FOCAL_PX else 800.0
     cx, cy = w/2.0, h/2.0
-    K = np.array([[f, 0, cx],
-                  [0, f, cy],
-                  [0, 0,  1]], dtype=np.float32)
+    K = np.array([[f, 0, cx], [0, f, cy], [0, 0, 1]], dtype=np.float32)
     dist = np.zeros((5,1), dtype=np.float32)
-
     s = REAL_SIZE_M / 2.0
-    objp = np.array([[-s, -s, 0],
-                     [ s, -s, 0],
-                     [ s,  s, 0],
-                     [-s,  s, 0]], dtype=np.float32)
+    objp = np.array([[-s,-s,0],[s,-s,0],[s,s,0],[-s,s,0]], dtype=np.float32)
     imgp = pts.astype(np.float32)
-
     flags = getattr(cv2, "SOLVEPNP_IPPE_SQUARE", cv2.SOLVEPNP_ITERATIVE)
     Z = None
     ok, rvec, tvec = cv2.solvePnP(objp, imgp, K, dist, flags=flags)
@@ -158,7 +185,6 @@ def estimate_distance_m_robust(contour, frame_shape):
         side_px = side_length_pixels(pts)
         if side_px is not None and side_px > 1:
             Z = (f * REAL_SIZE_M) / side_px
-
     side_px = side_length_pixels(pts)
     return Z, side_px, pts
 
@@ -166,11 +192,9 @@ def bbox_area_px2(contour):
     x, y, w, h = cv2.boundingRect(contour)
     return int(w * h)
 
-# ----------------- GELİŞMİŞ CONFIDENCE -----------------
 def _border_touch_score(contour, frame_shape, margin=3):
     h, w = frame_shape[:2]
-    xs = contour[:,:,0]
-    ys = contour[:,:,1]
+    xs = contour[:,:,0]; ys = contour[:,:,1]
     touches = (xs <= margin).any() or (xs >= w-1-margin).any() \
               or (ys <= margin).any() or (ys >= h-1-margin).any()
     return 0.0 if touches else 1.0
@@ -209,47 +233,31 @@ def compute_confidence(t, frame_shape):
     h, w = frame_shape[:2]
     vis = min(t.get("visible_frames", 0) / max(lock_threshold, 1), 1.0)
     c = t.get("contour", None)
-    if c is None:
-        return round(float(0.4*vis), 2)
-
+    if c is None: return round(float(0.4*vis), 2)
     pts = approx_square_corners(c)
     area = cv2.contourArea(c)
-
     border = _border_touch_score(c, frame_shape)
     right90 = _right_angle_score(pts)
     aspect = _aspect_score_minrect(c)
     extent, solidity = _fill_scores(c)
     area_norm = max(0.0, min(area/8000.0, 1.0))
-
     cx, cy = t["cx"], t["cy"]
     offset = math.hypot(cx - w/2, cy - h/2) / (0.5*w)
     offset_score = float(max(0.4, 1.0 - 0.6*offset))
-
-    base = (
-        0.15*vis +
-        0.20*right90 +
-        0.15*aspect +
-        0.20*extent +
-        0.15*solidity +
-        0.15*area_norm
-    )
-
+    base = (0.15*vis + 0.20*right90 + 0.15*aspect + 0.20*extent + 0.15*solidity + 0.15*area_norm)
     conf = border * base * offset_score
     soft_cap = 1.0
     if area_norm < 0.3 or right90 < 0.6 or extent < 0.6:
         soft_cap = 0.6
     conf = min(conf, soft_cap)
-
     return round(float(max(min(conf, 1.0), 0.0)), 2)
 
-# ----------------- SENSÖR KANCALARI -----------------
 def get_current_gps():
-    return None, None  # MAVLink/GPSD ile doldur
+    return None, None
 
 def get_altitude_m():
-    return None        # Örn. 10.0 verip test edebilirsin
+    return None  # örn. 10.0
 
-# ----------------- Tespit & Takip -----------------
 def detect_targets(mask, min_area, tracked_list):
     contours,_ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     current = []
@@ -272,26 +280,21 @@ def detect_targets(mask, min_area, tracked_list):
     for t in tracked_list:
         if all(abs(t["cx"]-d["cx"])>position_tolerance or abs(t["cy"]-d["cy"])>position_tolerance for d in current):
             t["lost_frames"]+=1
-    tracked_list[:] = [t for t in tracked_list if t["lost_frames"]<=lost_frame_threshold]
+    tracked_list[:]=[t for t in tracked_list if t["lost_frames"]<=lost_frame_threshold]
 
 def build_detection_info(color_name, target_dict, frame_shape):
     cx, cy = int(target_dict["cx"]), int(target_dict["cy"])
     contour = target_dict.get("contour", None)
     area_px2 = bbox_area_px2(contour) if contour is not None else 0
-
     H = get_altitude_m() if USE_ALTITUDE else None
     dist_alt, ground_range = (None, None)
     if H is not None:
         dist_alt, ground_range = distance_from_altitude((cx, cy), frame_shape, H)
-
     dist_size, side_px, pts = (None, None, None)
     if dist_alt is None and contour is not None:
         dist_size, side_px, pts = estimate_distance_m_robust(contour, frame_shape)
-
     chosen_dist = dist_alt if dist_alt is not None else dist_size
-
     lat, lon = get_current_gps()
-
     info = {
         "detected": True,
         "type": f"{color_name}_4x4",
@@ -302,7 +305,6 @@ def build_detection_info(color_name, target_dict, frame_shape):
         "target_lon": float(lon) if lon is not None else None,
         "confidence": compute_confidence(target_dict, frame_shape)
     }
-
     debug = {
         "side_px": side_px,
         "FOCAL_PX": FOCAL_PX,
@@ -313,41 +315,12 @@ def build_detection_info(color_name, target_dict, frame_shape):
     }
     return info, debug
 
-# ----------------- PiCamera2 Sarmalayıcı -----------------
-class PiCam:
-    def __init__(self, size=(1280, 720), flip_h=True):
-        self.picam = Picamera2()
-        self.flip_h = flip_h
-        # RGB888 formatıyla ana stream; hızlı ve OpenCV ile uyumlu
-        config = self.picam.create_video_configuration(
-            main={"size": size, "format": "BGR888"}
-        )
-        self.picam.configure(config)
-        # Otomatik kontrolleri varsayılan bırak (AE/AWB/AF yok; sabit fokus lens)
-        self.picam.start()
-
-    def read(self):
-        """
-        OpenCV uyumlu BGR frame döndürür.
-        """
-        rgb = self.picam.capture_array()  # RGB
-        if self.flip_h:
-            rgb = np.ascontiguousarray(np.fliplr(rgb))
-        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        return True, bgr
-
-    def stop(self):
-        try:
-            self.picam.stop()
-        except Exception:
-            pass
-
 # ----------------- PySide6 Arayüz -----------------
 class IHAInterface(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("İHA Görüntü ve TeleMETRİ Arayüzü")
-        self.setGeometry(100, 100, 1700, 900)
+        self.setWindowTitle("İHA Görüntü ve TeleMETRİ Arayüzü (RPi uyumlu)")
+        self.setGeometry(40, 40, 1700, 900)
         self.setStyleSheet("background-color: #1e1e1e; color: white;")
 
         title = QLabel("🚁 İHA GÖRÜNTÜ VE TELEMETRİ ARAYÜZÜ")
@@ -372,19 +345,12 @@ class IHAInterface(QWidget):
         self.json_label.setAlignment(Qt.AlignLeft)
         self.json_label.setStyleSheet("background:#111; border:1px solid #444; padding:6px;")
 
-        logo = QLabel()
-        pixmap = QPixmap("Varyans logo.jpg")
-        if not pixmap.isNull():
-            logo.setPixmap(pixmap.scaled(200, 150, Qt.KeepAspectRatio))
-        logo.setAlignment(Qt.AlignRight)
-
         bottom_layout = QHBoxLayout()
         left_box = QVBoxLayout()
         left_box.addWidget(self.status_label)
         left_box.addWidget(self.json_label)
         bottom_layout.addLayout(left_box)
         bottom_layout.addStretch()
-        bottom_layout.addWidget(logo)
 
         btn_start = QPushButton("▶ Başlat")
         btn_stop  = QPushButton("⏹ Durdur")
@@ -392,15 +358,8 @@ class IHAInterface(QWidget):
         for b in (btn_start, btn_stop, btn_exit):
             b.setFixedHeight(40)
             b.setStyleSheet("""
-                QPushButton {
-                    background-color: #2e8b57;
-                    color: white;
-                    font-size: 14px;
-                    border-radius: 8px;
-                }
-                QPushButton:hover {
-                    background-color: #3cb371;
-                }
+                QPushButton { background-color: #2e8b57; color: white; font-size: 14px; border-radius: 8px; }
+                QPushButton:hover { background-color: #3cb371; }
             """)
 
         button_layout = QHBoxLayout()
@@ -416,9 +375,6 @@ class IHAInterface(QWidget):
         main_layout.addLayout(button_layout)
         self.setLayout(main_layout)
 
-        # --- PiCamera2 başlat ---
-        self.cam = PiCam(size=(1280, 720), flip_h=True)
-
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frames)
 
@@ -428,6 +384,8 @@ class IHAInterface(QWidget):
 
         self.last_detection_json = {}
         self.debug = {}
+        # ---- Frame kaynağı ----
+        self.grabber = FrameGrabber(width=1280, height=720, fps=30)
 
     def make_video_frame(self, title):
         frame = QLabel(title)
@@ -438,62 +396,67 @@ class IHAInterface(QWidget):
 
     def start_stream(self):
         self.status_label.setText("Durum: Yayın Başladı")
-        self.timer.start(30)  # ~33 FPS hedef
+        self.timer.start(33)  # ~30 fps
 
     def stop_stream(self):
         self.status_label.setText("Durum: Durduruldu")
         self.timer.stop()
 
-    def closeEvent(self, event):
-        # Kamera temiz kapatılsın
+    def closeEvent(self, e):
         try:
-            self.timer.stop()
+            self.grabber.release()
         except Exception:
             pass
-        try:
-            self.cam.stop()
-        except Exception:
-            pass
-        return super().closeEvent(event)
+        return super().closeEvent(e)
 
     def update_frames(self):
         global prev_mask_blue, prev_mask_red
-        ret, frame = self.cam.read()
-        if not ret:
+        ret, frame_bgr = self.grabber.read()
+        if not ret or frame_bgr is None:
+            self.status_label.setText("Durum: Kare okunamadı")
             return
 
-        ensure_focal_from_fov(frame.shape[1])
+        ensure_focal_from_fov(frame_bgr.shape[1])
 
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        ref_x, ref_y = frame.shape[1]//2, frame.shape[0]//2
+        # Aynalama
+        frame_bgr = cv2.flip(frame_bgr, 1)
 
-        disp_main = frame.copy()
+        # ---- "Görüntü yoksa mavi algılıyor" fix'i: düşük parlaklıkta maskeleri kapat ----
+        hsv_for_check = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
+        if hsv_for_check[...,2].mean() < 10:  # çok karanlık / lens kapalı
+            disp_main = frame_bgr.copy()
+            cv2.putText(disp_main, "NO IMAGE (low brightness) - skipping detection",
+                        (20,30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,200,255), 2)
+            self.set_frame(self.label_main, disp_main)
+            self.set_frame(self.label_blue, np.zeros_like(frame_bgr))
+            self.set_frame(self.label_red,  np.zeros_like(frame_bgr))
+            return
+
+        hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
+        ref_x, ref_y = frame_bgr.shape[1]//2, frame_bgr.shape[0]//2
+
+        disp_main = frame_bgr.copy()
         cv2.circle(disp_main,(ref_x,ref_y),6,(0,255,255),-1)
 
-        # HSV eşikleri (sahada gerektiğinde ayarla)
         mask_blue = cv2.inRange(hsv,(90,80,50),(130,255,255))
         mask_red  = cv2.inRange(hsv,(0,180,150),(10,255,255)) | cv2.inRange(hsv,(160,100,100),(179,255,255))
-
-        # Morfolojik temizlik
         mask_blue = cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel,1)
         mask_blue = cv2.morphologyEx(mask_blue, cv2.MORPH_CLOSE, kernel,2)
         mask_red  = cv2.morphologyEx(mask_red,  cv2.MORPH_OPEN, kernel,1)
         mask_red  = cv2.morphologyEx(mask_red,  cv2.MORPH_CLOSE, kernel,2)
 
-        # Zaman ağırlıklı yumuşatma
         if prev_mask_blue is not None:
             mask_blue = cv2.addWeighted(mask_blue,alpha_mask,prev_mask_blue,1-alpha_mask,0).astype(np.uint8)
         prev_mask_blue = mask_blue.copy()
         if prev_mask_red is not None:
-            mask_red  = cv2.addWeighted(mask_red, alpha_mask,prev_mask_red, 1-alpha_mask,0).astype(np.uint8)
+            mask_red = cv2.addWeighted(mask_red,alpha_mask,prev_mask_red,1-alpha_mask,0).astype(np.uint8)
         prev_mask_red = mask_red.copy()
 
-        # Takip
         detect_targets(mask_blue, MIN_AREA, tracked_blue)
-        detect_targets(mask_red,  1000,     tracked_red)
+        detect_targets(mask_red, 1000, tracked_red)
 
         disp_blue = cv2.cvtColor(mask_blue,cv2.COLOR_GRAY2BGR)
-        disp_red  = cv2.cvtColor(mask_red, cv2.COLOR_GRAY2BGR)
+        disp_red  = cv2.cvtColor(mask_red,cv2.COLOR_GRAY2BGR)
 
         detection_json_to_show = None
         self.debug = {}
@@ -507,21 +470,17 @@ class IHAInterface(QWidget):
                 if t["locked"]:
                     cv2.drawContours(disp,[t["contour"]],-1,(0,0,255),2)
                     cv2.circle(disp,(t["cx"],t["cy"]),6,(0,0,255),-1)
-
-                    info, dbg = build_detection_info(color_name, t, frame.shape)
+                    info, dbg = build_detection_info(color_name, t, frame_bgr.shape)
                     detection_json_to_show = info
                     self.debug = dbg
-
                     print(json.dumps(info, ensure_ascii=False))
                 else:
                     cv2.circle(disp,(t["cx"],t["cy"]),4,color,-1)
 
-        # Debug overlay
         self.draw_debug_overlay(disp_main)
-
-        self.set_frame(self.label_main, disp_main)
-        self.set_frame(self.label_blue, disp_blue)
-        self.set_frame(self.label_red,  disp_red)
+        self.set_frame(self.label_main,disp_main)
+        self.set_frame(self.label_blue,disp_blue)
+        self.set_frame(self.label_red,disp_red)
 
         if detection_json_to_show is not None:
             self.last_detection_json = detection_json_to_show
@@ -550,7 +509,7 @@ class IHAInterface(QWidget):
     def set_frame(self,label,frame):
         rgb = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
         h,w,ch = rgb.shape
-        qimg = QImage(rgb.data,w,h,ch*w,QImage.Format_BGR888)
+        qimg = QImage(rgb.data,w,h,ch*w,QImage.Format_RGB888)
         pix = QPixmap.fromImage(qimg).scaled(label.width(),label.height(),Qt.KeepAspectRatio)
         label.setPixmap(pix)
 
