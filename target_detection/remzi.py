@@ -1,4 +1,5 @@
 import sys
+import platform
 import os
 import math
 import json
@@ -332,7 +333,7 @@ def build_detection_info(color_name, target_dict, frame_shape,state: StateManage
         dist_size, side_px, pts = estimate_distance_m_robust(contour, frame_shape)
     chosen_dist = dist_alt if dist_alt is not None else dist_size
     lat, lon = get_current_gps()
-    state.update_target({color_name},cx, cy, int(area_px2), compute_confidence(target_dict, frame_shape))
+    state.update_target(color_name, cx, cy, int(area_px2), compute_confidence(target_dict, frame_shape))
     info = {
         "detected": True,
         "type": f"{color_name}_4x4",
@@ -432,6 +433,9 @@ class IHAInterface(QWidget):
         self.worker = ActionWorker()
         self.worker.done.connect(self.on_worker_done)
         self.worker.start()
+
+        # State manager
+        self.state_manager = StateManager()
 
         # Maske belleği ve takip listeleri
         self.prev_mask_blue, self.prev_mask_red = None, None
@@ -562,7 +566,7 @@ class IHAInterface(QWidget):
                     cv2.circle(disp,(t["cx"],t["cy"]),6,(0,0,255),-1)
 
                     # Bilgi
-                    info, dbg = build_detection_info(color_name, t, frame_bgr.shape)
+                    info, dbg = build_detection_info(color_name, t, frame_bgr.shape, self.state_manager)
                     detection_json_to_show = info
                     self.debug = dbg
 
