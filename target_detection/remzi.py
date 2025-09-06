@@ -11,11 +11,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QImage, QPixmap, QFont
 from PySide6.QtCore import Qt, QTimer
 from pymavlink import mavutil
-from mavlink_func
 import time
 
 
-mavlink_func.test_mavlink_connection()
 # print("MAVLink bağlantısı kuruluyor...")
 
 # try:
@@ -321,14 +319,11 @@ class PiCam:
         self.picam.start()
 
     def read(self):
-        """
-        OpenCV uyumlu BGR frame döndürür.
-        """
-        rgb = self.picam.capture_array()  # RGB
-        if self.flip_h:
-            rgb = np.ascontiguousarray(np.fliplr(rgb))
-        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        return True, bgr
+       rgb = self.picam.capture_array()
+       if self.flip_h:
+          rgb = cv2.flip(rgb, -1)  # Hem yatay hem dikey ters çevirme
+       bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+       return True, bgr
 
     def stop(self):
         try:
