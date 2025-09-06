@@ -44,8 +44,7 @@ mavlink_func.test_mavlink_connection()
 # except Exception as e:
 #     print(f"❌ MAVLink mesaj gönderimi hatası: {e}")
 #     sys.exit(1)
-
-
+ 
 # ----------------- PiCamera2 İçe Aktarım -----------------
 from picamera2 import Picamera2
 
@@ -321,18 +320,21 @@ class PiCam:
         self.flip_h = flip_h
         # RGB888 formatıyla ana stream; hızlı ve OpenCV ile uyumlu
         config = self.picam.create_video_configuration(
-            main={"size": size, "format": "BGR888"}
+            main={"size": size, "format": "RGB888"}
         )
         self.picam.configure(config)
         # Otomatik kontrolleri varsayılan bırak (AE/AWB/AF yok; sabit fokus lens)
         self.picam.start()
 
     def read(self):
-       rgb = self.picam.capture_array()
-       if self.flip_h:
-          rgb = cv2.flip(rgb, -1)  # Hem yatay hem dikey ters çevirme
-       bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-       return True, bgr
+        """
+        OpenCV uyumlu BGR frame döndürür.
+        """
+        rgb = self.picam.capture_array()  # RGB
+        if self.flip_h:
+            rgb = np.ascontiguousarray(np.fliplr(rgb))
+        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        return True, bgr
 
     def stop(self):
         try:
@@ -507,7 +509,6 @@ class IHAInterface(QWidget):
                     cv2.circle(disp,(t["cx"],t["cy"]),6,(0,0,255),-1)
 
                     info, dbg = build_detection_info(color_name, t, frame.shape)
-                    send_mode
                     detection_json_to_show = info
                     self.debug = dbg
 
