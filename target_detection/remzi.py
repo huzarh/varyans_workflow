@@ -13,10 +13,15 @@ from PySide6.QtCore import Qt, QTimer
 from pymavlink import mavutil
 import time
 
-import mavlink_func
-import time
+# remzi.py
+import os
 
+# Add the parent directory to Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+import mavlink_func  # Now this should work
+
+# Run your function
 mavlink_func.test_mavlink_connection()
 # print("MAVLink bağlantısı kuruluyor...")
 
