@@ -320,7 +320,7 @@ class PiCam:
         self.flip_h = flip_h
         # RGB888 formatıyla ana stream; hızlı ve OpenCV ile uyumlu
         config = self.picam.create_video_configuration(
-            main={"size": size, "format": "RGB888"}
+            main={"size": size, "format": "BGR888"}
         )
         self.picam.configure(config)
         # Otomatik kontrolleri varsayılan bırak (AE/AWB/AF yok; sabit fokus lens)
@@ -550,7 +550,7 @@ class IHAInterface(QWidget):
     def set_frame(self,label,frame):
         rgb = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
         h,w,ch = rgb.shape
-        qimg = QImage(rgb.data,w,h,ch*w,QImage.Format_RGB888)
+        qimg = QImage(rgb.data,w,h,ch*w,QImage.Format_BGR888)
         pix = QPixmap.fromImage(qimg).scaled(label.width(),label.height(),Qt.KeepAspectRatio)
         label.setPixmap(pix)
 
