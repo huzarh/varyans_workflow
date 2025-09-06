@@ -20,7 +20,7 @@ except Exception:
 
 class FrameGrabber:
     """
-    Raspberry Pi'de öncelik: Picamera2 (BGR888 -> doğrudan BGR)
+    Raspberry Pi'de öncelik: Picamera2 (RGB888 -> doğrudan BGR)
     Desteklenmiyorsa RGB888 al ve BGR'ye çevir.
     Picamera2 hiç yoksa OpenCV VideoCapture (V4L2).
     """
@@ -29,19 +29,19 @@ class FrameGrabber:
         self.source = None
         self.picam = None
         self.cap = None
-        self.picam_format = None  # "BGR888" | "RGB888" | "XRGB8888" ...
+        self.picam_format = None  # "RGB888" | "RGB888" | "XRGB8888" ...
         self._open()
 
     def _open(self):
         if PICAM_AVAILABLE:
             try:
                 self.picam = Picamera2()
-                # Tercihen BGR888 (OpenCV ile uyumlu). Bazı sensörlerde yoksa RGB888'e düş.
+                # Tercihen RGB888 (OpenCV ile uyumlu). Bazı sensörlerde yoksa RGB888'e düş.
                 try:
                     cfg = self.picam.create_video_configuration(
-                        main={"size": (self.width, self.height), "format": "BGR888"}
+                        main={"size": (self.width, self.height), "format": "RGB888"}
                     )
-                    self.picam_format = "BGR888"
+                    self.picam_format = "RGB888"
                 except Exception:
                     cfg = self.picam.create_video_configuration(
                         main={"size": (self.width, self.height), "format": "RGB888"}
@@ -68,7 +68,7 @@ class FrameGrabber:
         if self.source == "picamera2":
             arr = self.picam.capture_array()
             # Picamera2’den geleni BGR’ye getir
-            if self.picam_format == "BGR888":
+            if self.picam_format == "RGB888":
                 frame_bgr = arr  # zaten BGR
             elif self.picam_format == "RGB888":
                 frame_bgr = arr[:, :, ::-1].copy()  # RGB -> BGR
