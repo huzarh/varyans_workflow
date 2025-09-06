@@ -17,9 +17,9 @@ import time
 import os
 
 # Add the parent directory to Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from .. import mavlink_func
 
-import mavlink_func  # Now this should work
+from controller import motion
 
 # Run your function
 # print("MAVLink bağlantısı kuruluyor...")
@@ -305,6 +305,7 @@ def detect_targets(mask, min_area, tracked_list):
                 current.append({"cx":cx,"cy":cy,"locked":False,
                                 "visible_frames":1,"lost_frames":0,"contour":c})
                 mavlink_func.test_mavlink_connection()
+                motion.planning()
 
     for det in current:
         matched = False
