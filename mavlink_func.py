@@ -1,6 +1,5 @@
 def test_mavlink_connection():
     from pymavlink import mavutil
-    import sys
     import time
 
     print("MAVLink bağlantısı kuruluyor...")

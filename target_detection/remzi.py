@@ -11,29 +11,32 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QImage, QPixmap, QFont
 from PySide6.QtCore import Qt, QTimer
 from pymavlink import mavutil
+from mavlink_func
 import time
 
-print("MAVLink bağlantısı kuruluyor...")
 
-try:
-    master = mavutil.mavlink_connection('udp:127.0.0.1:14540')
-    master.wait_heartbeat(timeout=5)
-    print(f"✅ MAVLink bağlandı! System: {master.target_system}, Component: {master.target_component}")
-except Exception as e:
-    print(f"❌ MAVLink bağlantısı başarısız: {e}")
-    sys.exit(1)
+mavlink_func.test_mavlink_connection()
+# print("MAVLink bağlantısı kuruluyor...")
 
-# ------------------ Test Komutu Gönder ------------------
-try:
-    print("📤 TEST: STATUSTEXT mesajı gönderiliyor...")
-    master.mav.statustext_send(
-        mavutil.mavlink.MAV_SEVERITY_NOTICE,
-        b"Baglanti testi: Varyans sistem basladi."
-    )
-    print("✅ STATUSTEXT mesajı gönderildi.")
-except Exception as e:
-    print(f"❌ MAVLink mesaj gönderimi hatası: {e}")
-    sys.exit(1)
+# try:
+#     master = mavutil.mavlink_connection('udp:127.0.0.1:14540')
+#     master.wait_heartbeat(timeout=5)
+#     print(f"✅ MAVLink bağlandı! System: {master.target_system}, Component: {master.target_component}")
+# except Exception as e:
+#     print(f"❌ MAVLink bağlantısı başarısız: {e}")
+#     sys.exit(1)
+
+# # ------------------ Test Komutu Gönder ------------------
+# try:
+#     print("📤 TEST: STATUSTEXT mesajı gönderiliyor...")
+#     master.mav.statustext_send(
+#         mavutil.mavlink.MAV_SEVERITY_NOTICE,
+#         b"Baglanti testi: Varyans sistem basladi."
+#     )
+#     print("✅ STATUSTEXT mesajı gönderildi.")
+# except Exception as e:
+#     print(f"❌ MAVLink mesaj gönderimi hatası: {e}")
+#     sys.exit(1)
 
 
 # ----------------- PiCamera2 İçe Aktarım -----------------
