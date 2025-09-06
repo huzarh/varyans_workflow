@@ -1,4 +1,4 @@
-# Python
+ Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -156,3 +156,4 @@ root/
 # Temporary files
 *.tmp
 *.temp
+EOF
