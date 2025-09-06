@@ -286,7 +286,7 @@ class PiCam:
         self.flip_h = flip_h
         # RGB888 formatıyla ana stream; hızlı ve OpenCV ile uyumlu
         config = self.picam.create_video_configuration(
-            main={"size": size, "format": "RGB888"}
+            main={"size": size, "format": "BGR888"}
         )
         self.picam.configure(config)
         # Otomatik kontrolleri varsayılan bırak (AE/AWB/AF yok; sabit fokus lens)
