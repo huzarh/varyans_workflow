@@ -1,14 +1,51 @@
+# cammod3_picam_gui.py — RPi Camera Module 3 (IMX708) + Picamera2 + PySide6
 import sys
 import cv2
 import numpy as np
 import math
-import json
-import platform
+import json 
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog
+    QApplication, QWidget, QLabel, QPushButton, QVBoxLayout,
+    QHBoxLayout
 )
 from PySide6.QtGui import QImage, QPixmap, QFont
 from PySide6.QtCore import Qt, QTimer
+from pymavlink import mavutil
+import time
+
+# remzi.py
+import os
+
+# Add the parent directory to Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import mavlink_func  # Now this should work
+
+# Run your function
+mavlink_func.test_mavlink_connection()
+# print("MAVLink bağlantısı kuruluyor...")
+
+# try:
+#     master = mavutil.mavlink_connection('udp:127.0.0.1:14540')
+#     master.wait_heartbeat(timeout=5)
+#     print(f"✅ MAVLink bağlandı! System: {master.target_system}, Component: {master.target_component}")
+# except Exception as e:
+#     print(f"❌ MAVLink bağlantısı başarısız: {e}")
+#     sys.exit(1)
+
+# # ------------------ Test Komutu Gönder ------------------
+# try:
+#     print("📤 TEST: STATUSTEXT mesajı gönderiliyor...")
+#     master.mav.statustext_send(
+#         mavutil.mavlink.MAV_SEVERITY_NOTICE,
+#         b"Baglanti testi: Varyans sistem basladi."
+#     )
+#     print("✅ STATUSTEXT mesajı gönderildi.")
+# except Exception as e:
+#     print(f"❌ MAVLink mesaj gönderimi hatası: {e}")
+#     sys.exit(1)
+ 
+import platform
 
 # ----------------- Kamera Soyutlama (RPi uyumlu) -----------------
 PICAM_AVAILABLE = False
