@@ -15,9 +15,9 @@ import time
 
 # remzi.py
 import os
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # Add the parent directory to Python path
-from .. import mavlink_func
+import mavlink_func
 
 from controller import motion
 
