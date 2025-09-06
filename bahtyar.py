@@ -557,7 +557,7 @@ class IntegratedIHAInterface(QWidget):
         """Frame'i Qt label'a set et"""
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
-        qt_image = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
+        qt_image = QImage(rgb.data, w, h, ch * w, QImage.Format_BGR888)
         pixmap = QPixmap.fromImage(qt_image)
         scaled_pixmap = pixmap.scaled(label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         label.setPixmap(scaled_pixmap)

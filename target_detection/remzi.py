@@ -3,13 +3,38 @@ import sys
 import cv2
 import numpy as np
 import math
-import json
+import json 
 from PySide6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton, QVBoxLayout,
     QHBoxLayout
 )
 from PySide6.QtGui import QImage, QPixmap, QFont
 from PySide6.QtCore import Qt, QTimer
+from pymavlink import mavutil
+import time
+
+print("MAVLink bağlantısı kuruluyor...")
+
+try:
+    master = mavutil.mavlink_connection('udp:127.0.0.1:14540')
+    master.wait_heartbeat(timeout=5)
+    print(f"✅ MAVLink bağlandı! System: {master.target_system}, Component: {master.target_component}")
+except Exception as e:
+    print(f"❌ MAVLink bağlantısı başarısız: {e}")
+    sys.exit(1)
+
+# ------------------ Test Komutu Gönder ------------------
+try:
+    print("📤 TEST: STATUSTEXT mesajı gönderiliyor...")
+    master.mav.statustext_send(
+        mavutil.mavlink.MAV_SEVERITY_NOTICE,
+        b"Baglanti testi: Varyans sistem basladi."
+    )
+    print("✅ STATUSTEXT mesajı gönderildi.")
+except Exception as e:
+    print(f"❌ MAVLink mesaj gönderimi hatası: {e}")
+    sys.exit(1)
+
 
 # ----------------- PiCamera2 İçe Aktarım -----------------
 from picamera2 import Picamera2
@@ -475,6 +500,7 @@ class IHAInterface(QWidget):
                     cv2.circle(disp,(t["cx"],t["cy"]),6,(0,0,255),-1)
 
                     info, dbg = build_detection_info(color_name, t, frame.shape)
+                    send_mode
                     detection_json_to_show = info
                     self.debug = dbg
 
