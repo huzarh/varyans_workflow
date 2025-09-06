@@ -22,7 +22,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import mavlink_func  # Now this should work
 
 # Run your function
-mavlink_func.test_mavlink_connection()
 # print("MAVLink bağlantısı kuruluyor...")
 
 # try:
@@ -305,6 +304,8 @@ def detect_targets(mask, min_area, tracked_list):
                 cx, cy = int(M["m10"]/M["m00"]), int(M["m01"]/M["m00"])
                 current.append({"cx":cx,"cy":cy,"locked":False,
                                 "visible_frames":1,"lost_frames":0,"contour":c})
+                mavlink_func.test_mavlink_connection()
+
     for det in current:
         matched = False
         for t in tracked_list:
