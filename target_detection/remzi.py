@@ -13,7 +13,11 @@ from PySide6.QtCore import Qt, QTimer
 from pymavlink import mavutil
 import time
 
+import mavlink_func
+import time
 
+
+mavlink_func.test_mavlink_connection()
 # print("MAVLink bağlantısı kuruluyor...")
 
 # try:
