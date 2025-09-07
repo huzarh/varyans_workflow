@@ -6,6 +6,11 @@ def guided_approach_velocity(state: StateManager):
     from pymavlink import mavutil
     import time
 
+    # Görev tamamlandıysa RTL moduna geç
+    if state.is_mission_completed():
+        print("🎯 GÖREV TAMAMLANDI! RTL moduna geçiliyor...")
+        return switch_to_rtl_mode()
+
     try:
         master = mavutil.mavlink_connection('udp:127.0.0.1:14540')
         master.wait_heartbeat(timeout=5)
@@ -77,9 +82,18 @@ def guided_approach_velocity(state: StateManager):
                     )
                     print("✅ Servo normal pozisyona döndürüldü (1500 PWM)")
                     
+                    # Yük sayacını artır
+                    mission_completed = state.increment_cargo_dropped()
+                    
                     # Hedefi temizle (bir kez bırakıldı)
                     state.clear_target()
                     print("🎯 Hedef temizlendi - yeni hedef aranacak")
+                    
+                    # Görev tamamlandıysa RTL moduna geç
+                    if mission_completed:
+                        print("🎯 TÜM YÜKLER BIRAKILDI! RTL moduna geçiliyor...")
+                        master.close()
+                        return switch_to_rtl_mode()
                     
                 except Exception as e:
                     print(f"❌ Yük bırakma hatası: {e}")
@@ -143,7 +157,9 @@ def guided_approach_velocity(state: StateManager):
             if abs(offset_x) <= 50 and abs(offset_y) <= 50:
                 direction = "MERKEZE YAKIN"
             
-            print(f"🎯 Hedef: {direction} | Offset: ({offset_x:.0f}, {offset_y:.0f}) | Merkez mesafesi: {total_offset:.1f}px | Velocity: vx={vx:.2f}, vy={vy:.2f}, vz={vz:.2f}")
+            # Yük durumunu göster
+            cargo_status = state.get_cargo_status()
+            print(f"🎯 Hedef: {direction} | Offset: ({offset_x:.0f}, {offset_y:.0f}) | Merkez mesafesi: {total_offset:.1f}px | Yük: {cargo_status['dropped']}/{cargo_status['max']} | Velocity: vx={vx:.2f}, vy={vy:.2f}, vz={vz:.2f}")
         
     else:
         print("❌ Hedef algılanmadı - hareket durduruluyor")
@@ -159,3 +175,44 @@ def guided_approach_velocity(state: StateManager):
         )
     
     master.close()
+
+def switch_to_rtl_mode():
+    """RTL moduna geçiş yap"""
+    from pymavlink import mavutil
+    import time
+    
+    print("🏠 RTL moduna geçiş yapılıyor...")
+    
+    try:
+        master = mavutil.mavlink_connection('udp:127.0.0.1:14540')
+        master.wait_heartbeat(timeout=5)
+        print(f"✅ MAVLink bağlandı! System: {master.target_system}, Component: {master.target_component}")
+    except Exception as e:
+        print(f"❌ MAVLink bağlantısı başarısız: {e}")
+        return False
+
+    try:
+        # RTL moduna geçiş
+        print("🏠 RTL moduna geçiş yapılıyor...")
+        master.mav.set_mode_send(
+            master.target_system,
+            mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+            6  # RTL mode ID
+        )
+        
+        # Mod değişimini kontrol et
+        time.sleep(2)
+        hb = master.recv_match(type='HEARTBEAT', blocking=True, timeout=3)
+        if hb and hb.custom_mode == 6:
+            print("✅ RTL moduna başarıyla geçildi!")
+            print("🏠 Drone eve dönüyor...")
+            return True
+        else:
+            print("❌ RTL moduna geçilemedi")
+            return False
+            
+    except Exception as e:
+        print(f"❌ RTL mod geçiş hatası: {e}")
+        return False
+    finally:
+        master.close()
