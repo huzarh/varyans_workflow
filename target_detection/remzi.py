@@ -282,7 +282,7 @@ class ActionWorker(QThread):
             except Exception as e:
                 self.done.emit(f"MAVLink hata: {e}")
                 continue
-
+            print("--------------motion----------------")
             try:
                 controller.guided_approach_velocity()
                 self.done.emit("motion.planning() OK")
