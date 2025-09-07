@@ -16,7 +16,7 @@ from PySide6.QtCore import Qt, QTimer, QThread, Signal
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import mavlink_func
-from controller import motion
+from flight import controller
 
 # state manager kütüphanesi
 from core.state_manager import StateManager
@@ -284,7 +284,7 @@ class ActionWorker(QThread):
                 continue
 
             try:
-                motion.planning()
+                controller.guided_approach_velocity(master,)
                 self.done.emit("motion.planning() OK")
             except Exception as e:
                 self.done.emit(f"motion.planning hata: {e}")
