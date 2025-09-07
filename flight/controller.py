@@ -43,6 +43,14 @@ class DroneController:
         bbox_area = target.get("bbox_area", 0)
         target_type = target.get("type", "unknown")
         
+        # None değer kontrolü
+        if bbox_area is None:
+            bbox_area = 0
+        if cx is None:
+            cx = 0
+        if cy is None:
+            cy = 0
+        
         # Merkez hesaplama
         center_x = camera_config.width // 2
         center_y = camera_config.height // 2
@@ -59,7 +67,7 @@ class DroneController:
         """Yük bırakma işlemi"""
         print(f"🎯 HEDEF MERKEZE GELDİ! Yük bırakma başlatılıyor...")
         print(f"📍 Hedef türü: {target_type}")
-        print(f"📍 Merkez offset: {total_offset:.1f} pixel (tolerans: {detection_config.center_tolerance})")
+        print(f"�� Merkez offset: {total_offset:.1f} pixel (tolerans: {detection_config.center_tolerance})")
         
         # Yük bırakma
         if not self._drop_cargo(target_type):
@@ -121,6 +129,14 @@ class DroneController:
         center_x = camera_config.width // 2
         center_y = camera_config.height // 2
         
+        # None değer kontrolü
+        if bbox_area is None:
+            bbox_area = 0
+        if cx is None:
+            cx = 0
+        if cy is None:
+            cy = 0
+        
         # Yatay yön kontrolü (vy - sağ/sol hareket)
         if abs(offset_x) > 50:  # 50 pixel tolerans
             vy = -offset_x / center_x * velocity_config.direction_factor_x
@@ -136,7 +152,12 @@ class DroneController:
             vz = 0
         
         # İleri hareket (vx) - hedefe yaklaşma
-        distance = max(0.5, 10.0 - (bbox_area / 1000.0))
+        # bbox_area None kontrolü eklendi
+        if bbox_area is not None and bbox_area > 0:
+            distance = max(0.5, 10.0 - (bbox_area / 1000.0))
+        else:
+            distance = 5.0  # Varsayılan mesafe
+        
         vx = min(velocity_config.max_vx, distance * velocity_config.approach_factor)
         
         # Velocity komutunu gönder
@@ -145,7 +166,7 @@ class DroneController:
         
         # Yön bilgilerini yazdır
         direction = self._get_direction_string(offset_x, offset_y)
-        print(f"�� Hedef: {direction} | Offset: ({offset_x:.0f}, {offset_y:.0f}) | Merkez mesafesi: {total_offset:.1f}px | Velocity: vx={vx:.2f}, vy={vy:.2f}, vz={vz:.2f}")
+        print(f"🎯 Hedef: {direction} | Offset: ({offset_x:.0f}, {offset_y:.0f}) | Merkez mesafesi: {total_offset:.1f}px | Velocity: vx={vx:.2f}, vy={vy:.2f}, vz={vz:.2f}")
         return True
     
     def _get_direction_string(self, offset_x: int, offset_y: int) -> str:

@@ -42,6 +42,18 @@ class StateManager:
     
     def update_target(self, target_type: str, cx: int, cy: int, bbox_area: int, confidence: float) -> None:
         """Hedef bilgilerini güncelle"""
+        # None değer kontrolü ve varsayılan değerler
+        if target_type is None:
+            target_type = "unknown"
+        if cx is None:
+            cx = 0
+        if cy is None:
+            cy = 0
+        if bbox_area is None:
+            bbox_area = 0
+        if confidence is None:
+            confidence = 0.0
+        
         print(f"----------> {target_type} {cx} {cy} {bbox_area} {confidence}")
         
         self.state["target_detected"] = True
