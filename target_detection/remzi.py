@@ -253,8 +253,9 @@ def get_altitude_m():
 class ActionWorker(QThread):
     done = Signal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, state_manager, parent=None):
         super().__init__(parent)
+        self.state_manager = state_manager
         self._queue = []
         self._running = True
         self._last_action_ts = 0.0
@@ -284,10 +285,10 @@ class ActionWorker(QThread):
                 continue
             print("--------------motion----------------")
             try:
-                controller.guided_approach_velocity()
-                self.done.emit("motion.planning() OK")
+                controller.guided_approach_velocity(self.state_manager)
+                self.done.emit("Controller.py() OK")
             except Exception as e:
-                self.done.emit(f"motion.planning hata: {e}")
+                self.done.emit(f"Controller.py hata: {e}")
 
 # ----------------- Algılama -----------------
 def detect_targets(mask, min_area, tracked_list):
@@ -421,6 +422,9 @@ class IHAInterface(QWidget):
         btn_stop.clicked.connect(self.stop_stream)
         btn_exit.clicked.connect(self.close)
 
+        # State manager
+        self.state_manager = StateManager()
+
         # Durum/Debug
         self.last_detection_json = {}
         self.debug = {}
@@ -430,14 +434,10 @@ class IHAInterface(QWidget):
         self.grabber = FrameGrabber(width=1280, height=720, fps=30)
 
         # UI dışı işçi
-        self.worker = ActionWorker()
+        self.worker = ActionWorker(self.state_manager)
         self.worker.done.connect(self.on_worker_done)
         self.worker.start()
 
-        # State manager
-        self.state_manager = StateManager()
-
-        # Maske belleği ve takip listeleri
         self.prev_mask_blue, self.prev_mask_red = None, None
         self.tracked_blue, self.tracked_red = [], []
 
