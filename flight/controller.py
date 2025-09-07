@@ -6,7 +6,7 @@ from core.state_manager import StateManager
 from core.mavlink_manager import MAVLinkManager
 from core.config import camera_config, detection_config, servo_config, mission_config, velocity_config, MAVLINK_CONNECTION
 
-class DroneController:
+class UavController:
     """Drone kontrol sınıfı"""
     
     def __init__(self):
@@ -199,10 +199,10 @@ class DroneController:
 # Backward compatibility için eski fonksiyonlar
 def guided_approach_velocity(state: StateManager) -> bool:
     """Backward compatibility için eski fonksiyon"""
-    controller = DroneController()
+    controller = UavController()
     return controller.guided_approach_velocity(state)
 
 def switch_to_rtl_mode() -> bool:
     """Backward compatibility için eski fonksiyon"""
-    controller = DroneController()
+    controller = UavController()
     return controller._switch_to_rtl_mode()
