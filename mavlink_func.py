@@ -3,7 +3,7 @@ def test_mavlink_connection():
     from pymavlink import mavutil
     import time
 
-    print("MAVLink bağlantısı kuruluyor...")
+    print("MAVLink bağlantısı kuruluyor -----------------GUİDED ...")
 
     try:
         master = mavutil.mavlink_connection('udp:127.0.0.1:14540')
