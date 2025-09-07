@@ -284,7 +284,7 @@ class ActionWorker(QThread):
                 continue
 
             try:
-                controller.guided_approach_velocity(master,)
+                controller.guided_approach_velocity()
                 self.done.emit("motion.planning() OK")
             except Exception as e:
                 self.done.emit(f"motion.planning hata: {e}")

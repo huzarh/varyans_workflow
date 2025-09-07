@@ -8,9 +8,9 @@ def guided_approach_velocity(state: StateManager):
     try:
         master = mavutil.mavlink_connection('udp:127.0.0.1:14540')
         master.wait_heartbeat(timeout=5)
-        print(f"✅ MAVLink bağlandı! System: {master.target_system}, Component: {master.target_component}")
+        print(f"✅ --------> controller: {master.target_system}, Component: {master.target_component}")
     except Exception as e:
-        print(f"❌ MAVLink bağlantısı başarısız: {e}")
+        print(f"❌ MAVLink bağlantısı başarısız CONTROLLLER: {e}")
     while True:
         if state.state["target_detected"]:
             target = state.state["target_info"]
