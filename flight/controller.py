@@ -2,6 +2,7 @@
 from core.state_manager import StateManager
 
 def guided_approach_velocity(state: StateManager):
+    print("tttttee---------------------eeesttt")
     from pymavlink import mavutil
     import time
 
