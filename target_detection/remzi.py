@@ -26,7 +26,8 @@ from PySide6.QtCore import Qt, QTimer, QThread, Signal
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from core.state_manager import StateManager
 from core.config import camera_config, detection_config
-from flight.controller import DroneController
+from flight.controller import UavController
+from mode.mavlink_func import switch_to_guided
 
 # ----------------- Kamera Soyutlama -----------------
 PICAM_AVAILABLE = False
@@ -240,7 +241,7 @@ class ActionWorker(QThread):
     def __init__(self, state_manager: StateManager, parent=None):
         super().__init__(parent)
         self.state_manager = state_manager
-        self.controller = DroneController()
+        self.controller = UavController()
         self._queue = []
         self._running = True
         self._last_action_ts = 0.0
@@ -267,6 +268,13 @@ class ActionWorker(QThread):
                 continue
             
             self._last_action_ts = now
+
+            try:
+                print("jhkjhkjhkj--------------GUİDED")
+                switch_to_guided()
+            except Exception as e:
+                self.done.emit(f"MAVLink hata: {e}")
+                continue
             
             try:
                 self.controller.guided_approach_velocity(self.state_manager)
