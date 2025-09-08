@@ -11,9 +11,13 @@ import sys
 import time
 from typing import Generator, Optional, Tuple
 
+# GUI plugin uyarılarını engellemek için güvenli offscreen ayarı
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 import cv2
-from flask import Flask, Response
+from flask import Flask, Response, request
 from flask_cors import CORS
+import socket
 
 # Proje köküne import yolu ekle
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -96,11 +100,26 @@ class CameraSource:
             pass
 
 
+def get_primary_ip() -> str:
+    """Cihazın yerel ağdaki birincil IP adresini tespit eder."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            return ip
+    except Exception:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return "127.0.0.1"
+
+
 app = Flask(__name__)
 CORS(app, resources={r"/ucus_arayuz": {"origins": "*"}})
 
 # Kamera kaynağını global başlat
 camera: Optional[CameraSource] = None
+first_client_logged = False
 
 
 def init_camera() -> None:
@@ -111,7 +130,14 @@ def init_camera() -> None:
 
 @app.route("/ucus_arayuz")
 def video_feed() -> Response:
+    global first_client_logged
     init_camera()
+
+    # İlk istemci loglama
+    if not first_client_logged:
+        client_ip = request.remote_addr or "unknown"
+        print(f"İlk istemci bağlandı: {client_ip} -> /ucus_arayuz")
+        first_client_logged = True
 
     def generate_frames() -> Generator[bytes, None, None]:
         assert camera is not None
@@ -146,13 +172,19 @@ def root() -> str:
 
 
 if __name__ == "__main__":
+    PORT = 5000
     try:
         init_camera()
+        ip = get_primary_ip()
         print(
             f"Kamera başlatıldı: {camera.source_type if camera else 'none'} | "
             f"{camera.width}x{camera.height}@{camera.fps}"
         )
-        app.run(host="0.0.0.0", port=5000, threaded=True)
+        print("Yayın adresleri:")
+        print(f"- http://{ip}:{PORT}/ucus_arayuz")
+        print(f"- http://127.0.0.1:{PORT}/ucus_arayuz")
+        print("Tarayıcıyla açın veya MJPEG destekli istemciyle bağlanın.")
+        app.run(host="0.0.0.0", port=PORT, threaded=True)
     finally:
         if camera is not None:
             camera.release() 
