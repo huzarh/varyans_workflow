@@ -2,6 +2,7 @@
 """
 Raspberry Pi 5 için HTTP Stream Server
 Görüntü işleme sonuçlarını web üzerinden gözlemleme
+25-35 FPS, 600x300px boyutunda yayın
 """
 import cv2
 import numpy as np
@@ -64,6 +65,8 @@ class StreamHandler(BaseHTTPRequestHandler):
             border: 2px solid #444; 
             border-radius: 8px;
             overflow: hidden;
+            width: 600px;
+            height: 300px;
         }
         .video-container h3 { 
             position: absolute; 
@@ -73,11 +76,13 @@ class StreamHandler(BaseHTTPRequestHandler):
             padding: 5px 10px; 
             border-radius: 4px;
             margin: 0;
+            z-index: 10;
         }
         img { 
             display: block; 
-            max-width: 100%; 
-            height: auto;
+            width: 100%; 
+            height: 100%;
+            object-fit: cover;
         }
         .data-panel {
             background: #2a2a2a;
@@ -105,7 +110,7 @@ class StreamHandler(BaseHTTPRequestHandler):
     </style>
 </head>
 <body>
-    <h1>🚁 İHA Target Detection Stream</h1>
+    <h1>🚁 İHA Target Detection Stream (600x300px, 25-35 FPS)</h1>
     <div class="container">
         <div class="video-container">
             <h3>Ana Görsel</h3>
@@ -117,6 +122,7 @@ class StreamHandler(BaseHTTPRequestHandler):
                 <div><strong>Status:</strong> <span id="status">Connecting...</span></div>
                 <div><strong>FPS:</strong> <span id="fps">0</span></div>
                 <div><strong>Frame Count:</strong> <span id="frameCount">0</span></div>
+                <div><strong>Resolution:</strong> 600x300px</div>
             </div>
             <div class="detection-info">
                 <h4>🔵 Blue Targets</h4>
@@ -204,12 +210,17 @@ class StreamHandler(BaseHTTPRequestHandler):
         """
     
     def stream_video(self):
-        """Video stream gönder"""
+        """Video stream gönder - 25-35 FPS"""
+        frame_time = 1.0 / 30.0  # 30 FPS (25-35 arası ortalama)
+        
         while True:
             if hasattr(self.server, 'current_frame') and self.server.current_frame is not None:
-                # Frame'i JPEG'e çevir
-                _, buffer = cv2.imencode('.jpg', self.server.current_frame, 
-                                       [cv2.IMWRITE_JPEG_QUALITY, 80])
+                # Frame'i 600x300 boyutuna küçült
+                resized_frame = cv2.resize(self.server.current_frame, (600, 300))
+                
+                # Frame'i JPEG'e çevir (daha yüksek kalite)
+                _, buffer = cv2.imencode('.jpg', resized_frame, 
+                                       [cv2.IMWRITE_JPEG_QUALITY, 85])
                 frame_bytes = buffer.tobytes()
                 
                 # HTTP multipart response
@@ -219,11 +230,14 @@ class StreamHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(frame_bytes)
                 self.wfile.write(b'\r\n')
+                
+                # FPS kontrolü için bekleme
+                time.sleep(frame_time)
             else:
-                time.sleep(0.033)  # 30 FPS
+                time.sleep(frame_time)
 
 class StreamServer:
-    """HTTP Stream Server"""
+    """HTTP Stream Server - 600x300px, 25-35 FPS"""
     
     def __init__(self, host: str = '0.0.0.0', port: int = 8080):
         self.host = host
@@ -237,6 +251,8 @@ class StreamServer:
         self.server = None
         self.thread = None
         self.running = False
+        self.target_width = 600
+        self.target_height = 300
     
     def start(self):
         """Server'ı başlat"""
@@ -252,6 +268,8 @@ class StreamServer:
             self.running = True
             print(f"🌐 Stream Server başlatıldı: http://{self.host}:{self.port}")
             print(f"📱 Mobil erişim: http://172.20.10.4:{self.port}")
+            print(f"📐 Stream boyutu: {self.target_width}x{self.target_height}px")
+            print(f"🎬 FPS: 25-35 arası (hedef: 30 FPS)")
             
         except Exception as e:
             print(f"❌ Stream Server başlatılamadı: {e}")
@@ -265,7 +283,7 @@ class StreamServer:
         print("🛑 Stream Server durduruldu")
     
     def update_frame(self, frame: np.ndarray):
-        """Frame'i güncelle"""
+        """Frame'i güncelle - orijinal boyutta sakla, stream'de küçült"""
         self.current_frame = frame.copy()
         if self.server:
             self.server.current_frame = self.current_frame

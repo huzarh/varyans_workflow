@@ -766,7 +766,7 @@ def main():
             stream_server.update_frame(disp_main)
             stream_server.update_detection_data(blue_detection_data, red_detection_data)
             
-            time.sleep(0.033)  # ~30 fps
+            time.sleep(0.030)  # ~33 fps (25-35 arası)
             
     except KeyboardInterrupt:
         print("Program durduruldu")
