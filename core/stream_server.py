@@ -251,7 +251,7 @@ class StreamServer:
             
             self.running = True
             print(f"🌐 Stream Server başlatıldı: http://{self.host}:{self.port}")
-            print(f"📱 Mobil erişim: http://[RASPBERRY_PI_IP]:{self.port}")
+            print(f"📱 Mobil erişim: http://172.20.10.4:{self.port}")
             
         except Exception as e:
             print(f"❌ Stream Server başlatılamadı: {e}")
