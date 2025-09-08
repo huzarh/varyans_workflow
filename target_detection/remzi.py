@@ -742,7 +742,6 @@ def main():
                         # Action gönder
                         if not t.get("action_sent", False):
                             try:
-                                print("jhkjhkjhkj--------------GUİDED")
                                 switch_to_guided()
                                 controller = UavController()
                                 controller.guided_approach_velocity(state_manager)
