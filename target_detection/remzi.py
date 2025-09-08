@@ -667,11 +667,8 @@ def main():
             # Karanlık kontrolü
             hsv_for_check = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
             if hsv_for_check[..., 2].mean() < 10:
-                print("NO IMAGE (low brightness) - skipping detection")
                 # Stream server'a karanlık frame gönder
                 dark_frame = frame_bgr.copy()
-                cv2.putText(dark_frame, "NO IMAGE (low brightness) - skipping detection",
-                           (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
                 stream_server.update_frame(dark_frame)
                 continue
             
