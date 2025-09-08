@@ -69,8 +69,11 @@ class StreamServer:
         print(f"🌐 Stream aktif: http://{ip}:{self.port}")
         print("🎬 FPS: 25–35 arası | Boyut: 600x300")
 
+    def update_frame(self, frame):
+        """Remzi.py gibi manuel frame güncellemeleri için"""
+        self.server.current_frame = frame
+
     def stop(self):
-        """Sunucuyu durdur"""
         if self.server:
             self.server.shutdown()
             self.server.server_close()
