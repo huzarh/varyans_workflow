@@ -17,7 +17,7 @@ import numpy as np
 # MAVLink
 from pymavlink import mavutil
 
-# # GUI
+# # GUI - COMMENTED FOR HEADLESS OPERATION
 # from PySide6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout
 # from PySide6.QtGui import QImage, QPixmap, QFont
 # from PySide6.QtCore import Qt, QTimer, QThread, Signal
@@ -28,6 +28,7 @@ from core.state_manager import StateManager
 from core.config import camera_config, detection_config
 from flight.controller import UavController
 from mode.mavlink_func import switch_to_guided
+from core.stream_server import StreamServer
 
 # ----------------- Kamera Soyutlama -----------------
 PICAM_AVAILABLE = False
@@ -233,7 +234,7 @@ FOCAL_PX = None
 kernel = np.ones((5, 5), np.uint8)
 alpha_mask = 1
 
-# ----------------- Asenkron İşçi -----------------
+# ----------------- Asenkron İşçi - COMMENTED FOR HEADLESS OPERATION -----------------
 # class ActionWorker(QThread):
 #     """Optimize edilmiş action worker"""
 #     done = Signal(str)
@@ -365,7 +366,7 @@ def build_detection_info(color_name: str, target_dict: Dict[str, Any], frame_sha
     
     return info, debug
 
-# # ----------------- PySide6 Arayüz -----------------
+# # ----------------- PySide6 Arayüz - COMMENTED FOR HEADLESS OPERATION -----------------
 # class IHAInterface(QWidget):
 #     """Optimize edilmiş ana arayüz"""
 #     
@@ -622,7 +623,7 @@ def build_detection_info(color_name: str, target_dict: Dict[str, Any], frame_sha
 #             pass
 #         return super().closeEvent(e)
 
-# # ----------------- Çalıştır -----------------
+# # ----------------- Çalıştır - COMMENTED FOR HEADLESS OPERATION -----------------
 # if __name__ == "__main__":
 #     app = QApplication(sys.argv)
 #     win = IHAInterface()
@@ -639,6 +640,10 @@ def main():
     
     # Frame grabber
     grabber = FrameGrabber()
+    
+    # Stream server başlat
+    stream_server = StreamServer(host='0.0.0.0', port=8080)
+    stream_server.start()
     
     # Takip listeleri
     tracked_blue = []
@@ -663,6 +668,11 @@ def main():
             hsv_for_check = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
             if hsv_for_check[..., 2].mean() < 10:
                 print("NO IMAGE (low brightness) - skipping detection")
+                # Stream server'a karanlık frame gönder
+                dark_frame = frame_bgr.copy()
+                cv2.putText(dark_frame, "NO IMAGE (low brightness) - skipping detection",
+                           (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
+                stream_server.update_frame(dark_frame)
                 continue
             
             # Maske oluşturma
@@ -689,15 +699,45 @@ def main():
             detect_targets(mask_blue, detection_config.min_area, tracked_blue)
             detect_targets(mask_red, detection_config.min_area, tracked_red)
             
+            # Görselleştirme
+            disp_main = frame_bgr.copy()
+            disp_blue = cv2.cvtColor(mask_blue, cv2.COLOR_GRAY2BGR)
+            disp_red = cv2.cvtColor(mask_red, cv2.COLOR_GRAY2BGR)
+            
+            # Merkez çizgisi
+            ref_x, ref_y = frame_bgr.shape[1] // 2, frame_bgr.shape[0] // 2
+            cv2.circle(disp_main, (ref_x, ref_y), 6, (0, 255, 255), -1)
+            cv2.circle(disp_blue, (ref_x, ref_y), 6, (0, 255, 255), -1)
+            cv2.circle(disp_red, (ref_x, ref_y), 6, (0, 255, 255), -1)
+            
+            detection_json_to_show = None
+            blue_detection_data = None
+            red_detection_data = None
+            
             # Hedef işleme
-            for color_name, tracked_list in [("blue", tracked_blue), ("red", tracked_red)]:
+            for color_name, tracked_list, disp, color in [
+                ("blue", tracked_blue, disp_blue, (255, 0, 0)),
+                ("red", tracked_red, disp_red, (0, 0, 255))
+            ]:
                 for t in tracked_list:
                     if not t["locked"] and t["visible_frames"] >= detection_config.lock_threshold:
                         t["locked"] = True
                     
                     if t["locked"]:
+                        # Çizimler
+                        if t.get("contour") is not None:
+                            cv2.drawContours(disp, [t["contour"]], -1, (0, 0, 255), 2)
+                        cv2.circle(disp, (t["cx"], t["cy"]), 6, (0, 0, 255), -1)
+                        
                         # Bilgi oluştur
                         info, dbg = build_detection_info(color_name, t, frame_bgr.shape, state_manager)
+                        detection_json_to_show = info
+                        
+                        # Stream server'a detection data gönder
+                        if color_name == "blue":
+                            blue_detection_data = info
+                        else:
+                            red_detection_data = info
                         
                         # Action gönder
                         if not t.get("action_sent", False):
@@ -718,6 +758,13 @@ def main():
                                 print(json.dumps(info, ensure_ascii=False))
                             except Exception:
                                 pass
+                    else:
+                        # Kilit yoksa küçük nokta
+                        cv2.circle(disp, (t["cx"], t["cy"]), 4, color, -1)
+            
+            # Stream server'a frame ve detection data gönder
+            stream_server.update_frame(disp_main)
+            stream_server.update_detection_data(blue_detection_data, red_detection_data)
             
             time.sleep(0.033)  # ~30 fps
             
@@ -725,6 +772,7 @@ def main():
         print("Program durduruldu")
     finally:
         grabber.release()
+        stream_server.stop()
 
 if __name__ == "__main__":
     main()
