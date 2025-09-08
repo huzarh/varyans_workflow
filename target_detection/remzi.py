@@ -311,6 +311,19 @@ def build_detection_info(color_name: str, target_dict: Dict[str, Any], frame_sha
     
     return info, debug
 
+# ----------------- Hedef Merkezi ile Kamera Merkezi Arası Çizgi Fonksiyonu -----------------
+def draw_center_line(frame: np.ndarray, target_center: Tuple[int, int], color: Tuple[int, int, int], thickness: int = 2):
+    """Kamera merkezi ile hedef merkezi arasında çizgi çiz"""
+    frame_height, frame_width = frame.shape[:2]
+    camera_center = (frame_width // 2, frame_height // 2)
+    
+    # Çizgiyi çiz
+    cv2.line(frame, camera_center, target_center, color, thickness)
+    
+    # Çizgi uclarına küçük daireler ekle (opsiyonel)
+    cv2.circle(frame, camera_center, 3, color, -1)
+    cv2.circle(frame, target_center, 3, color, -1)
+
 # ----------------- Headless Çalıştırma -----------------
 def main():
     """Raspberry Pi 5 için headless çalıştırma"""
@@ -388,7 +401,6 @@ def main():
             cv2.circle(disp_blue, (ref_x, ref_y), 6, (0, 255, 255), -1)
             cv2.circle(disp_red, (ref_x, ref_y), 6, (0, 255, 255), -1)
             
-
             # Hedef işleme
             for color_name, tracked_list, disp, color in [
                 ("blue", tracked_blue, disp_blue, (255, 0, 0)),
@@ -403,6 +415,18 @@ def main():
                         if t.get("contour") is not None:
                             cv2.drawContours(disp, [t["contour"]], -1, (0, 0, 255), 2)
                         cv2.circle(disp, (t["cx"], t["cy"]), 6, (0, 0, 255), -1)
+                        
+                        # Hedef merkezi ile kamera merkezi arası çizgi çiz (ana frame'de)
+                        target_center = (t["cx"], t["cy"])
+                        
+                        # Mavi hedefler için mavi çizgi, kırmızı hedefler için kırmızı çizgi
+                        if color_name == "blue":
+                            line_color = (255, 0, 0)  # Mavi (BGR)
+                        else:  # red
+                            line_color = (0, 0, 255)  # Kırmızı (BGR)
+                        
+                        # Ana görüntüye çizgiyi çiz
+                        draw_center_line(disp_main, target_center, line_color, thickness=3)
                         
                         # Bilgi oluştur
                         info, dbg = build_detection_info(color_name, t, frame_bgr.shape, state_manager)
@@ -425,13 +449,21 @@ def main():
                                 print(json.dumps(info, ensure_ascii=False))
                             except Exception:
                                 pass
-                    # else:  # Kaldırıldı
+                    else:
                         # Kilit yoksa küçük nokta
                         cv2.circle(disp, (t["cx"], t["cy"]), 4, color, -1)
+                        
+                        # Kilitsiz hedefler için de çizgi çiz (daha ince)
+                        target_center = (t["cx"], t["cy"])
+                        if color_name == "blue":
+                            line_color = (255, 100, 100)  # Açık mavi
+                        else:  # red  
+                            line_color = (100, 100, 255)  # Açık kırmızı
+                        
+                        draw_center_line(disp_main, target_center, line_color, thickness=1)
             
-            # Stream server'a frame ve detection data gönder
+            # Stream server'a frame gönder
             stream_server.update_frame(disp_main)
-            # Detection data kaldırıldı - sadece video stream
             
             time.sleep(0.030)  # ~33 fps (25-35 arası)
             
