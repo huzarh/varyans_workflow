@@ -83,7 +83,7 @@ class FrameGrabber:
                 arr = self.picam.capture_array()
                 frame_bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
                 return True, frame_bgr
-            else:
+            # else:  # Kaldırıldı
                 return self.cap.read()
         except Exception as e:
             print(f"Kare okunamadı: {e}")
@@ -194,11 +194,11 @@ def estimate_distance_m_robust(contour: np.ndarray, frame_shape: Tuple[int, int,
     ok, rvec, tvec = cv2.solvePnP(objp, imgp, K, dist, flags=flags)
     if ok:
         Z = float(np.linalg.norm(tvec))
-    else:
+    # else:  # Kaldırıldı
         side_px = side_length_pixels(pts)
         if side_px is not None and side_px > 1:
             Z = (f * camera_config.real_size_m) / side_px
-        else:
+        # else:  # Kaldırıldı
             Z = None
     
     side_px = side_length_pixels(pts)
@@ -599,7 +599,7 @@ def build_detection_info(color_name: str, target_dict: Dict[str, Any], frame_sha
 #                             print(json.dumps(info, ensure_ascii=False))
 #                         except Exception:
 #                             pass
-#                 else:
+#                 # else:  # Kaldırıldı
 #                     # Kilit yoksa küçük nokta
 #                     cv2.circle(disp, (t["cx"], t["cy"]), 4, color, -1)
 #         
@@ -711,8 +711,8 @@ def main():
             cv2.circle(disp_red, (ref_x, ref_y), 6, (0, 255, 255), -1)
             
             detection_json_to_show = None
-            blue_detection_data = None
-            red_detection_data = None
+            # blue_detection_data = None  # Kaldırıldı
+            # red_detection_data = None  # Kaldırıldı
             
             # Hedef işleme
             for color_name, tracked_list, disp, color in [
@@ -734,10 +734,10 @@ def main():
                         detection_json_to_show = info
                         
                         # Stream server'a detection data gönder
-                        if color_name == "blue":
-                            blue_detection_data = info
-                        else:
-                            red_detection_data = info
+                        # if color_name == "blue":  # Kaldırıldı
+                            # blue_detection_data = info  # Kaldırıldı
+                        # else:  # Kaldırıldı
+                            # red_detection_data = info  # Kaldırıldı
                         
                         # Action gönder
                         if not t.get("action_sent", False):
@@ -758,13 +758,13 @@ def main():
                                 print(json.dumps(info, ensure_ascii=False))
                             except Exception:
                                 pass
-                    else:
+                    # else:  # Kaldırıldı
                         # Kilit yoksa küçük nokta
                         cv2.circle(disp, (t["cx"], t["cy"]), 4, color, -1)
             
             # Stream server'a frame ve detection data gönder
             stream_server.update_frame(disp_main)
-            stream_server.update_detection_data(blue_detection_data, red_detection_data)
+            # Detection data kaldırıldı - sadece video stream
             
             time.sleep(0.030)  # ~33 fps (25-35 arası)
             
