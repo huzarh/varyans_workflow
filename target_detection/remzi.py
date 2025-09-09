@@ -21,7 +21,7 @@ from core.state_manager import StateManager
 from core.config import camera_config, detection_config
 from flight.controller import UavController
 from mode.mavlink_func import switch_to_guided
-from core.stream_server import StreamServer
+from core.stream_server import StableStreamServer as StreamServer
 
 # ----------------- Kamera Soyutlama -----------------
 PICAM_AVAILABLE = False
