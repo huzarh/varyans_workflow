@@ -446,12 +446,14 @@ def main():
                         print_counter += 1
                         if print_counter % detection_config.print_every_n == 0:
                             try:
+                                # info zaten yukarıda tanımlandı
                                 print(json.dumps(info, ensure_ascii=False))
                             except Exception:
                                 pass
                     else:
                         # Kilit yoksa küçük nokta
                         cv2.circle(disp, (t["cx"], t["cy"]), 4, color, -1)
+                        cv2.circle(disp_main, (t["cx"], t["cy"]), 6, color, 1)
                         
                         # Kilitsiz hedefler için de çizgi çiz (daha ince)
                         target_center = (t["cx"], t["cy"])
@@ -461,9 +463,45 @@ def main():
                             line_color = (100, 100, 255)  # Açık kırmızı
                         
                         draw_center_line(disp_main, target_center, line_color, thickness=1)
+                        
+                        # Kilitsiz hedef bilgilerini de ekle
+                        target_info_list.append({
+                            "color": color_name,
+                            "position": [t["cx"], t["cy"]],
+                            "confidence": compute_confidence(t, frame_bgr.shape),
+                            "distance": None,
+                            "locked": False
+                        })
             
-            # Stream server'a frame gönder
+            # Ekranda FPS ve hedef bilgilerini göster
+            fps_text = f"FPS: {current_fps:.1f}"
+            target_text = f"Targets: {total_targets} | Locked: {locked_targets}"
+            
+            # FPS bilgisini ekranın sol üstüne yaz
+            cv2.putText(disp_main, fps_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                       0.7, (0, 255, 0), 2)
+            
+            # Hedef bilgisini FPS'nin altına yaz
+            cv2.putText(disp_main, target_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 
+                       0.7, (0, 255, 0), 2)
+            
+            # Stream server'a frame ve meta data gönder
+            stream_metadata = {
+                "fps": round(current_fps, 1),
+                "total_targets": total_targets,
+                "locked_targets": locked_targets,
+                "targets": target_info_list,
+                "timestamp": time.time()
+            }
+            
             stream_server.update_frame(disp_main)
+            # Meta data gönderimi için stream_server'ın bu özelliği desteklemesi gerekiyor
+            # Eğer destekliyorsa:
+            try:
+                if hasattr(stream_server, 'update_metadata'):
+                    stream_server.update_metadata(stream_metadata)
+            except Exception as e:
+                pass  # Meta data gönderilemezse sessizce devam et
             
             time.sleep(0.030)  # ~33 fps (25-35 arası)
             
