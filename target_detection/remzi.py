@@ -12,6 +12,11 @@ from typing import List, Dict, Any, Optional, Tuple
 
 # Görüntü işleme
 import cv2
+try:
+    # OpenCV loglarını sessize al
+    cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
+except Exception:
+    pass
 import numpy as np
 
 
@@ -26,8 +31,10 @@ from core.stream_server import StableStreamServer as StreamServer
 # ----------------- Kamera Soyutlama -----------------
 PICAM_AVAILABLE = False
 try:
-    from picamera2 import Picamera2
-    PICAM_AVAILABLE = True
+    # Ortam değişkeni ile Picamera2 devre dışı bırakılabilir
+    if os.getenv("DISABLE_PICAM", "0") != "1":
+        from picamera2 import Picamera2
+        PICAM_AVAILABLE = True
 except ImportError:
     PICAM_AVAILABLE = False
 
