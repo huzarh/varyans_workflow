@@ -58,16 +58,50 @@ class FrameGrabber:
             except Exception as e:
                 print(f"Picamera2 açılamadı, V4L2'ye düşülüyor: {e}")
         
-        # V4L2 fallback
-        backend = cv2.CAP_V4L2 if platform.system() != "Windows" else cv2.CAP_DSHOW
-        self.cap = cv2.VideoCapture(0, backend)
-        if self.cap is None or not self.cap.isOpened():
-            raise RuntimeError("Kamera açılamadı (ne Picamera2 ne V4L2).")
+        # V4L2/OpenCV fallback - birden çok index ve backend dene
+        backends = []
+        try:
+            backends.append(cv2.CAP_V4L2)
+        except Exception:
+            pass
+        try:
+            backends.append(cv2.CAP_ANY)
+        except Exception:
+            pass
+        if platform.system() == "Windows":
+            try:
+                backends.append(cv2.CAP_DSHOW)
+            except Exception:
+                pass
+        if not backends:
+            backends = [0]
         
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        self.cap.set(cv2.CAP_PROP_FPS, self.fps)
-        self.source = "opencv"
+        tried = []
+        for backend in backends:
+            for cam_index in [0, 1, 2, 3]:
+                try:
+                    cap = cv2.VideoCapture(cam_index, backend) if isinstance(backend, int) else cv2.VideoCapture(cam_index)
+                    if cap is not None and cap.isOpened():
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+                        cap.set(cv2.CAP_PROP_FPS, self.fps)
+                        self.cap = cap
+                        self.source = "opencv"
+                        return
+                    else:
+                        tried.append(f"index {cam_index} backend {backend}")
+                        if cap is not None:
+                            cap.release()
+                except Exception:
+                    tried.append(f"index {cam_index} backend {backend}")
+                    try:
+                        cap.release()
+                    except Exception:
+                        pass
+        
+        # Kameralar açılamadı -> sentetik kaynak kullan
+        print("Uyarı: Hiçbir kamera açılamadı. Sentetik siyah frame kaynağı kullanılacak.")
+        self.source = "synthetic"
     
     def read(self) -> Tuple[bool, Optional[np.ndarray]]:
         """Frame oku"""
@@ -76,7 +110,11 @@ class FrameGrabber:
                 arr = self.picam.capture_array()
                 frame_bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
                 return True, frame_bgr
-            return self.cap.read()
+            if self.source == "opencv":
+                return self.cap.read()
+            if self.source == "synthetic":
+                return True, np.zeros((self.height, self.width, 3), dtype=np.uint8)
+            return False, None
         except Exception as e:
             print(f"Kare okunamadı: {e}")
             return False, None
@@ -90,6 +128,7 @@ class FrameGrabber:
                 pass
         if self.source == "opencv" and self.cap is not None:
             self.cap.release()
+        # synthetic için yapılacak bir şey yok
 
 # ----------------- Geometri & Mesafe -----------------
 def angle_cos(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> float:
