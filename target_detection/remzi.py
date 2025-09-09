@@ -377,7 +377,7 @@ def main():
     stream_server = None
     try:
         stream_server = StreamServer(host='0.0.0.0', port=8080)
-        stream_server.start()
+        stream_server.start(enable_capture=False)
     except Exception as e:
         print(f"Stream server başlatılamadı: {e}")
         return

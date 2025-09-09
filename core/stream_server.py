@@ -168,8 +168,10 @@ class StableStreamServer:
             cap.release()
             print("Kamera kapatıldı")
     
-    def start(self):
-        """Sunucuyu başlat"""
+    def start(self, enable_capture=False):
+        """Sunucuyu başlat
+        enable_capture=True ise dahili kamera yakalama başlar, aksi halde yalnız itme (push) modu kullanılır.
+        """
         if self.running:
             print("Server zaten çalışıyor!")
             return
@@ -179,10 +181,11 @@ class StableStreamServer:
             self.server = HTTPServer((self.host, self.port), StreamHandler)
             self.server.frame_queue = self.frame_queue
             
-            # Capture thread başlat
+            # Capture thread başlat (opsiyonel)
             self.running = True
-            self.capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
-            self.capture_thread.start()
+            if enable_capture:
+                self.capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
+                self.capture_thread.start()
             
             # Server thread başlat
             self.server_thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -261,7 +264,7 @@ if __name__ == "__main__":
     server = StableStreamServer(port=8080, cam_index=0)
     
     try:
-        server.start()
+        server.start(enable_capture=True)
         print("Çıkmak için Ctrl+C basın...")
         
         # Ana loop
