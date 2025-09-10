@@ -26,6 +26,7 @@ import numpy as np
 
 # MAVLink
 from pymavlink import mavutil
+from core.yuk import servo_blue_target, servo_red_target  # Add this import
 
 # GUI
 from PySide6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout
@@ -596,6 +597,11 @@ class IHAInterface(QWidget):
             for t in tracked_list:
                 if not t["locked"] and t["visible_frames"] >= detection_config.lock_threshold:
                     t["locked"] = True
+                    # Hedef kilitlendiğinde servo kontrolü
+                    if color_name == "blue":
+                        servo_blue_target()
+                    elif color_name == "red":
+                        servo_red_target()
                 
                 if t["locked"]:
                     # Çizimler

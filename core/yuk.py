@@ -40,6 +40,14 @@ def set_servo7(pwm_value):
     print(f"⚠️ Servo 7 timeout")
     return False
 
+def servo_blue_target():
+    """Mavi hedef algılandığında Servo 7'yi 1000 PWM'e ayarla"""
+    return set_servo7(1000)
+
+def servo_red_target():
+    """Kırmızı hedef algılandığında Servo 7'yi 2000 PWM'e ayarla"""
+    return set_servo7(2000)
+
 try:
     print("\n🚀 Servo 7 Test Başlıyor...")
     
