@@ -8,7 +8,7 @@ from streaming import start_streaming_server
 os.environ.setdefault("LIBCAMERA_LOG_LEVELS", "3")
 
 STREAM_TARGET_FPS   = 30
-STREAM_MAX_WIDTH    = 480
+STREAM_MAX_WIDTH    = 380
 STREAM_JPEG_QUALITY = 60
 
 REAL_SIZE_M = 0.05
