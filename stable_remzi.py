@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, cv2, math, json, time, socket, threading, argparse, platform, signal, shutil, sys
+import os, cv2, math, json, time, argparse, platform, signal, shutil, sys
 import numpy as np
 from streaming import start_streaming_server
-
+from core.yuk import servo_blue_target, servo_red_target 
 os.environ.setdefault("LIBCAMERA_LOG_LEVELS", "3")
 
 STREAM_TARGET_FPS   = 30
@@ -411,6 +411,10 @@ def run(cam_backend="opencv", cam_index=0, port=8080, ae=True, iso=200,
                 for t in tracked_list:
                     if not t["locked"] and t["visible_frames"]>=lock_threshold: t["locked"]=True
                     if not t["locked"]: continue
+                    if color_name == "blue":
+                        servo_blue_target()
+                    elif color_name == "red":
+                        servo_red_target()
                     cx, cy = t["cx"], t["cy"]
                     cv2.drawContours(disp,[t["contour"]],-1,(0,0,255),2)
                     cv2.line(disp, (ref_x, ref_y), (cx, cy), (0, 255, 0), 2, cv2.LINE_AA)
