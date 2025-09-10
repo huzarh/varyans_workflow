@@ -98,6 +98,54 @@ class FrameGrabber:
         if self.source == "opencv" and self.cap is not None:
             self.cap.release()
 
+class FrameGrabber:
+    def __init__(self):
+        self.camera = None
+        self.picam2 = None
+        self._open()
+
+    def _open(self):
+        # Try Picamera2 first with proper configuration
+        try:
+            from picamera2 import Picamera2
+            self.picam2 = Picamera2()
+            
+            # Configure with specific format for IMX708
+            preview_config = self.picam2.create_preview_configuration(
+                main={"size": (1536, 864), "format": "BGR888"},
+                buffer_count=4
+            )
+            self.picam2.configure(preview_config)
+            
+            # Add delay before starting to avoid resource busy errors
+            time.sleep(0.5)
+            self.picam2.start()
+            print("Using Picamera2 with IMX708")
+            return
+        except Exception as e:
+            print(f"Picamera2 açılamadı, V4L2'ye düşülüyor: {str(e)}")
+            if hasattr(self.picam2, 'close'):
+                self.picam2.close()
+            
+        # Try V4L2 with retries and specific backend
+        import cv2
+        max_retries = 3
+        for i in range(max_retries):
+            try:
+                self.camera = cv2.VideoCapture(0, cv2.CAP_V4L2)
+                if self.camera.isOpened():
+                    # Set lower resolution for V4L2 fallback
+                    self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                    self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                    print("Using V4L2 camera")
+                    return
+            except Exception:
+                pass
+            print(f"V4L2 attempt {i+1} failed, retrying...")
+            time.sleep(1)
+            
+        raise RuntimeError("Kamera açılamadı (ne Picamera2 ne V4L2). Cihaz izinlerini ve başka işlemlerin kamerayı kullanıp kullanmadığını kontrol edin.")
+
 # ----------------- Geometri & Mesafe -----------------
 def angle_cos(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> float:
     """Açı kosinüsünü hesapla"""
