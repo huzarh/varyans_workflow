@@ -49,72 +49,16 @@ except ImportError:
 
 class FrameGrabber:
     """Optimize edilmiş kamera sınıfı"""
-    
-    def __init__(self, width: int = None, height: int = None, fps: int = None):
-        self.width = width or camera_config.width
-        self.height = height or camera_config.height
-        self.fps = fps or camera_config.fps
-        self.source = None
-        self.picam = None
-        self.cap = None
+    def __init__(self):
+        self.camera = None  # OpenCV camera
+        self.picam2 = None  # Picamera2
+        self.width = 1536
+        self.height = 864
+        self.fps = 30
         self._open()
     
     def _open(self):
         """Kamera kaynağını aç"""
-        if PICAM_AVAILABLE:
-            try:
-                self.picam = Picamera2()
-                cfg = self.picam.create_video_configuration(
-                    main={"size": (self.width, self.height), "format": "BGR888"}
-                )
-                self.picam.configure(cfg)
-                self.picam.start()
-                self.source = "picamera2"
-                return
-            except Exception as e:
-                print(f"Picamera2 açılamadı, V4L2'ye düşülüyor: {e}")
-        
-        # V4L2 fallback
-        backend = cv2.CAP_V4L2 if platform.system() != "Windows" else cv2.CAP_DSHOW
-        self.cap = cv2.VideoCapture(0, backend)
-        if self.cap is None or not self.cap.isOpened():
-            raise RuntimeError("Kamera açılamadı (ne Picamera2 ne V4L2).")
-        
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        self.cap.set(cv2.CAP_PROP_FPS, self.fps)
-        self.source = "opencv"
-    
-    def read(self) -> Tuple[bool, Optional[np.ndarray]]:
-        """Frame oku"""
-        try:
-            if self.source == "picamera2":
-                arr = self.picam.capture_array()
-                frame_bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
-                return True, frame_bgr
-            else:
-                return self.cap.read()
-        except Exception as e:
-            print(f"Kare okunamadı: {e}")
-            return False, None
-    
-    def release(self):
-        """Kamera kaynağını serbest bırak"""
-        if self.source == "picamera2" and self.picam is not None:
-            try:
-                self.picam.stop()
-            except Exception:
-                pass
-        if self.source == "opencv" and self.cap is not None:
-            self.cap.release()
-
-class FrameGrabber:
-    def __init__(self):
-        self.camera = None
-        self.picam2 = None
-        self._open()
-
-    def _open(self):
         # Try Picamera2 first with proper configuration
         try:
             from picamera2 import Picamera2
@@ -122,7 +66,7 @@ class FrameGrabber:
             
             # Configure with specific format for IMX708
             preview_config = self.picam2.create_preview_configuration(
-                main={"size": (1536, 864), "format": "BGR888"},
+                main={"size": (self.width, self.height), "format": "BGR888"},
                 buffer_count=4
             )
             self.picam2.configure(preview_config)
@@ -137,16 +81,15 @@ class FrameGrabber:
             if hasattr(self.picam2, 'close'):
                 self.picam2.close()
             
-        # Try V4L2 with retries and specific backend
-        import cv2
+        # Try V4L2 with retries
         max_retries = 3
         for i in range(max_retries):
             try:
                 self.camera = cv2.VideoCapture(0, cv2.CAP_V4L2)
                 if self.camera.isOpened():
-                    # Set lower resolution for V4L2 fallback
                     self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
                     self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                    self.camera.set(cv2.CAP_PROP_FPS, self.fps)
                     print("Using V4L2 camera")
                     return
             except Exception:
@@ -154,7 +97,32 @@ class FrameGrabber:
             print(f"V4L2 attempt {i+1} failed, retrying...")
             time.sleep(1)
             
-        raise RuntimeError("Kamera açılamadı (ne Picamera2 ne V4L2). Cihaz izinlerini ve başka işlemlerin kamerayı kullanıp kullanmadığını kontrol edin.")
+        raise RuntimeError("Kamera açılamadı (ne Picamera2 ne V4L2)")
+
+    def read(self):
+        """Frame oku"""
+        try:
+            if self.picam2 is not None:
+                frame = self.picam2.capture_array()
+                return True, frame
+            elif self.camera is not None:
+                return self.camera.read()
+            return False, None
+        except Exception as e:
+            print(f"Kare okunamadı: {e}")
+            return False, None
+
+    def release(self):
+        """Kamera kaynağını serbest bırak"""
+        try:
+            if self.picam2 is not None:
+                self.picam2.stop()
+                self.picam2 = None
+            if self.camera is not None:
+                self.camera.release()
+                self.camera = None
+        except Exception as e:
+            print(f"Kamera kapatılırken hata: {e}")
 
 # ----------------- Geometri & Mesafe -----------------
 def angle_cos(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> float:
@@ -687,6 +655,20 @@ class HeadlessDetector:
         self.state_manager = StateManager()
         self.tracked_blue = []
         self.tracked_red = []
+        self._running = True
+        
+    def stop(self):
+        """Detection loop'unu durdur"""
+        self._running = False
+        if self.grabber:
+            if hasattr(self.grabber, 'release'):
+                self.grabber.release()
+            elif hasattr(self.grabber, 'picam2'):
+                if self.grabber.picam2:
+                    self.grabber.picam2.stop()
+            elif hasattr(self.grabber, 'camera'):
+                if self.grabber.camera:
+                    self.grabber.camera.release()
         
     def start(self):
         """Detection loop'unu başlat"""
@@ -695,7 +677,7 @@ class HeadlessDetector:
         print("Kamera hazır, detection başlıyor")
         
         try:
-            while True:
+            while self._running:
                 ret, frame_bgr = self.grabber.read()
                 if not ret or frame_bgr is None:
                     print("Kare okunamadı")
@@ -728,26 +710,28 @@ class HeadlessDetector:
         except KeyboardInterrupt:
             print("\nProgram sonlandırılıyor...")
         finally:
-            if self.grabber:
-                self.grabber.release()
+            self.stop()
 
 # ----------------- Çalıştır -----------------
 if __name__ == "__main__":
+    detector = None
     try:
         if not DISPLAY_AVAILABLE:
             detector = HeadlessDetector()
             detector.start()
         else:
             app = QApplication(sys.argv)
-            # Disable size hints warning
             app.setAttribute(Qt.AA_DisableWindowContextHelpButton)
-            app.setStyle('Fusion')  # Use Fusion style for better compatibility
+            app.setStyle('Fusion')
             
             win = IHAInterface()
             win.show()
             sys.exit(app.exec())
     except KeyboardInterrupt:
-        print("\nProgram sonlandırılıyor...")
+        print("\nKullanıcı tarafından durduruldu...")
     except Exception as e:
         print(f"Hata: {e}")
-        sys.exit(1)
+    finally:
+        if detector:
+            detector.stop()
+        sys.exit(0)
