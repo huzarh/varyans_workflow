@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+import os
+import sys
+
+# Check display availability and configure Qt before any Qt imports
+DISPLAY_AVAILABLE = bool(os.environ.get('DISPLAY', ''))
+if not DISPLAY_AVAILABLE:
+    print("Display bulunamadı - Headless modda çalışılıyor")
+    os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+    os.environ['QT_LOGGING_RULES'] = '*.debug=false;qt.qpa.*=false'
+
 """
 Optimize edilmiş target detection sistemi
 """
@@ -670,29 +680,23 @@ class IHAInterface(QWidget):
             pass
         return super().closeEvent(e)
 
-# ----------------- Çalıştır -----------------
-if __name__ == "__main__":
-    import os
-
-    # Force headless mode if no display is available
-    DISPLAY_AVAILABLE = bool(os.environ.get('DISPLAY', ''))
-    if not DISPLAY_AVAILABLE:
-        os.environ['QT_QPA_PLATFORM'] = 'offscreen'
-
-    # ...existing code until QApplication import...
-
-    def run_headless():
-        """Display olmadığında çalışacak headless mod"""
-        print("Display bulunamadı - Headless modda çalışılıyor")
+class HeadlessDetector:
+    """Display olmadığında çalışacak detector sınıfı"""
+    def __init__(self):
+        self.grabber = None
+        self.state_manager = StateManager()
+        self.tracked_blue = []
+        self.tracked_red = []
         
-        grabber = FrameGrabber()
-        state_manager = StateManager()
-        tracked_blue = []
-        tracked_red = []
+    def start(self):
+        """Detection loop'unu başlat"""
+        print("Kamera başlatılıyor...")
+        self.grabber = FrameGrabber()
+        print("Kamera hazır, detection başlıyor")
         
         try:
             while True:
-                ret, frame_bgr = grabber.read()
+                ret, frame_bgr = self.grabber.read()
                 if not ret or frame_bgr is None:
                     print("Kare okunamadı")
                     time.sleep(0.1)
@@ -701,17 +705,22 @@ if __name__ == "__main__":
                 # HSV dönüşümü ve maskeler
                 hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
                 mask_blue = cv2.inRange(hsv, (90, 80, 50), (130, 255, 255))
-                mask_red = cv2.inRange(hsv, (0, 180, 150), (10, 255, 255)) | cv2.inRange(hsv, (160, 100, 100), (179, 255, 255))
+                mask_red = cv2.inRange(hsv, (0, 180, 150), (10, 255, 255)) | \
+                          cv2.inRange(hsv, (160, 100, 100), (179, 255, 255))
+                
+                # Morfoloji
+                mask_blue = cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel)
+                mask_red = cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel)
                 
                 # Hedef tespiti
-                detect_targets(mask_blue, detection_config.min_area, tracked_blue)
-                detect_targets(mask_red, detection_config.min_area, tracked_red)
+                detect_targets(mask_blue, detection_config.min_area, self.tracked_blue)
+                detect_targets(mask_red, detection_config.min_area, self.tracked_red)
                 
-                # Hedef bilgilerini logla
-                for color_name, tracked_list in [("blue", tracked_blue), ("red", tracked_red)]:
+                # Hedefleri işle
+                for color_name, tracked_list in [("blue", self.tracked_blue), ("red", self.tracked_red)]:
                     for t in tracked_list:
                         if t.get("locked", False):
-                            info, _ = build_detection_info(color_name, t, frame_bgr.shape, state_manager)
+                            info, _ = build_detection_info(color_name, t, frame_bgr.shape, self.state_manager)
                             print(json.dumps(info, ensure_ascii=False))
                 
                 time.sleep(0.033)  # ~30fps
@@ -719,13 +728,26 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             print("\nProgram sonlandırılıyor...")
         finally:
-            grabber.release()
+            if self.grabber:
+                self.grabber.release()
 
-    if __name__ == "__main__":
+# ----------------- Çalıştır -----------------
+if __name__ == "__main__":
+    try:
         if not DISPLAY_AVAILABLE:
-            run_headless()
+            detector = HeadlessDetector()
+            detector.start()
         else:
             app = QApplication(sys.argv)
+            # Disable size hints warning
+            app.setAttribute(Qt.AA_DisableWindowContextHelpButton)
+            app.setStyle('Fusion')  # Use Fusion style for better compatibility
+            
             win = IHAInterface()
             win.show()
             sys.exit(app.exec())
+    except KeyboardInterrupt:
+        print("\nProgram sonlandırılıyor...")
+    except Exception as e:
+        print(f"Hata: {e}")
+        sys.exit(1)
