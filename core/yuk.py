@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-YUK Module - Servo 7 Target Control
-Servo 7 için hedef kontrol fonksiyonları
-"""
 from pymavlink import mavutil
 import time
 
@@ -53,15 +49,7 @@ def _set_servo7_pwm(pwm_value, target_name):
     return False
 
 def servo_red_target():
-    """
-    Kırmızı hedef - Servo 7'yi 2000 PWM'e ayarla
-    Returns: bool - Komut başarılı olursa True
-    """
     return _set_servo7_pwm(2000, "RED TARGET")
 
 def servo_blue_target():
-    """
-    Mavi hedef - Servo 7'yi 1000 PWM'e ayarla  
-    Returns: bool - Komut başarılı olursa True
-    """
     return _set_servo7_pwm(1000, "BLUE TARGET")
